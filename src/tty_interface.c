@@ -102,9 +102,9 @@ static void draw(tty_interface_t *state) {
 	}
 
 	tty_setcol(tty, 0);
-	fputs(options->prompt, tty->fout);
+	tty_fputs(tty, options->prompt);
 	for (size_t i = 0; i < state->cursor; i++)
-		fputc(state->search[i], tty->fout);
+		tty_putc(tty, state->search[i]);
 	tty_flush(tty);
 }
 

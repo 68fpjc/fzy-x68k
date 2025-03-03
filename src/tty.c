@@ -179,6 +179,14 @@ void tty_printf(tty_t *tty, const char *fmt, ...) {
 	va_end(args);
 }
 
+void tty_fputs(tty_t *tty, const char *s) {
+	fputs(s, tty->fout);
+}
+
+void tty_putc(tty_t *tty, const char c) {
+	fputc(c, tty->fout);
+}
+
 void tty_flush(tty_t *tty) {
 	fflush(tty->fout);
 }
