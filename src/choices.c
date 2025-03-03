@@ -1,5 +1,4 @@
 #include <errno.h>
-#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -108,12 +107,6 @@ void choices_init(choices_t *c, options_t *options) {
 	c->capacity = c->size = 0;
 	choices_resize(c, INITIAL_CHOICE_CAPACITY);
 
-	if (options->workers) {
-		c->worker_count = options->workers;
-	} else {
-		c->worker_count = (int)sysconf(_SC_NPROCESSORS_ONLN);
-	}
-
 	choices_reset_search(c);
 }
 
@@ -152,155 +145,25 @@ struct result_list {
 	size_t size;
 };
 
-struct search_job {
-	pthread_mutex_t lock;
-	choices_t *choices;
-	const char *search;
-	size_t processed;
-	struct worker *workers;
-};
+void choices_search(choices_t *c, const char *search) {
+	choices_reset_search(c);
 
-struct worker {
-	pthread_t thread_id;
-	struct search_job *job;
-	unsigned int worker_num;
-	struct result_list result;
-};
-
-static void worker_get_next_batch(struct search_job *job, size_t *start, size_t *end) {
-	pthread_mutex_lock(&job->lock);
-
-	*start = job->processed;
-
-	job->processed += BATCH_SIZE;
-	if (job->processed > job->choices->size) {
-		job->processed = job->choices->size;
-	}
-
-	*end = job->processed;
-
-	pthread_mutex_unlock(&job->lock);
-}
-
-static struct result_list merge2(struct result_list list1, struct result_list list2) {
-	size_t result_index = 0, index1 = 0, index2 = 0;
-
-	struct result_list result;
-	result.size = list1.size + list2.size;
-	result.list = malloc(result.size * sizeof(struct scored_result));
-	if (!result.list) {
+	c->results = malloc(c->size * sizeof(struct scored_result));
+	if (!c->results) {
 		fprintf(stderr, "Error: Can't allocate memory\n");
 		abort();
 	}
 
-	while (index1 < list1.size && index2 < list2.size) {
-		if (cmpchoice(&list1.list[index1], &list2.list[index2]) < 0) {
-			result.list[result_index++] = list1.list[index1++];
-		} else {
-			result.list[result_index++] = list2.list[index2++];
+	c->available = 0;
+	for (size_t i = 0; i < c->size; i++) {
+		if (has_match(search, c->strings[i])) {
+			c->results[c->available].str = c->strings[i];
+			c->results[c->available].score = match(search, c->strings[i]);
+			c->available++;
 		}
 	}
 
-	while (index1 < list1.size) {
-		result.list[result_index++] = list1.list[index1++];
-	}
-	while (index2 < list2.size) {
-		result.list[result_index++] = list2.list[index2++];
-	}
-
-	free(list1.list);
-	free(list2.list);
-
-	return result;
-}
-
-static void *choices_search_worker(void *data) {
-	struct worker *w = (struct worker *)data;
-	struct search_job *job = w->job;
-	const choices_t *c = job->choices;
-	struct result_list *result = &w->result;
-
-	size_t start, end;
-
-	for (;;) {
-		worker_get_next_batch(job, &start, &end);
-
-		if (start == end) {
-			break;
-		}
-
-		for (size_t i = start; i < end; i++) {
-			if (has_match(job->search, c->strings[i])) {
-				result->list[result->size].str = c->strings[i];
-				result->list[result->size].score =
-				    match(job->search, c->strings[i]);
-				result->size++;
-			}
-		}
-	}
-
-	/* Sort the partial result */
-	qsort(result->list, result->size, sizeof(struct scored_result), cmpchoice);
-
-	/* Fan-in, merging results */
-	for (unsigned int step = 0;; step++) {
-		if (w->worker_num % (2 << step))
-			break;
-
-		unsigned int next_worker = w->worker_num | (1 << step);
-		if (next_worker >= c->worker_count)
-			break;
-
-		if ((errno = pthread_join(job->workers[next_worker].thread_id, NULL))) {
-			perror("pthread_join");
-			exit(EXIT_FAILURE);
-		}
-
-		w->result = merge2(w->result, job->workers[next_worker].result);
-	}
-
-	return NULL;
-}
-
-void choices_search(choices_t *c, const char *search) {
-	choices_reset_search(c);
-
-	struct search_job *job = calloc(1, sizeof(struct search_job));
-	job->search = search;
-	job->choices = c;
-	if (pthread_mutex_init(&job->lock, NULL) != 0) {
-		fprintf(stderr, "Error: pthread_mutex_init failed\n");
-		abort();
-	}
-	job->workers = calloc(c->worker_count, sizeof(struct worker));
-
-	struct worker *workers = job->workers;
-	for (int i = c->worker_count - 1; i >= 0; i--) {
-		workers[i].job = job;
-		workers[i].worker_num = i;
-		workers[i].result.size = 0;
-		workers[i].result.list =
-		    malloc(c->size * sizeof(struct scored_result)); /* FIXME: This is overkill */
-
-		/* These must be created last-to-first to avoid a race condition when fanning in */
-		if ((errno = pthread_create(&workers[i].thread_id, NULL, &choices_search_worker,
-					    &workers[i]))) {
-			perror("pthread_create");
-			exit(EXIT_FAILURE);
-		}
-	}
-
-	if (pthread_join(workers[0].thread_id, NULL)) {
-		perror("pthread_join");
-		exit(EXIT_FAILURE);
-	}
-
-	c->results = workers[0].result.list;
-	c->available = workers[0].result.size;
-
-	free(workers);
-	pthread_mutex_destroy(&job->lock);
-	free(job);
+	qsort(c->results, c->available, sizeof(struct scored_result), cmpchoice);
 }
 
 const char *choices_get(choices_t *c, size_t n) {
