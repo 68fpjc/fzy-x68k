@@ -1,13 +1,13 @@
-#include <stdio.h>
-#include <unistd.h>
+#include <errno.h>
 #include <fcntl.h>
-#include <stdlib.h>
+#include <signal.h>
 #include <stdarg.h>
-#include <termios.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <sys/ioctl.h>
 #include <sys/select.h>
-#include <signal.h>
-#include <errno.h>
+#include <termios.h>
+#include <unistd.h>
 
 #include "tty.h"
 
@@ -23,7 +23,7 @@ void tty_close(tty_t *tty) {
 	close(tty->fdin);
 }
 
-static void handle_sigwinch(int sig){
+static void handle_sigwinch(int sig) {
 	(void)sig;
 }
 
@@ -109,13 +109,8 @@ int tty_input_ready(tty_t *tty, long int timeout, int return_on_signal) {
 	if (!return_on_signal)
 		sigaddset(&mask, SIGWINCH);
 
-	int err = pselect(
-			tty->fdin + 1,
-			&readfs,
-			NULL,
-			NULL,
-			timeout < 0 ? NULL : &ts,
-			return_on_signal ? NULL : &mask);
+	int err = pselect(tty->fdin + 1, &readfs, NULL, NULL, timeout < 0 ? NULL : &ts,
+			  return_on_signal ? NULL : &mask);
 
 	if (err < 0) {
 		if (errno == EINTR) {

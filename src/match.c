@@ -1,12 +1,12 @@
 #include <ctype.h>
-#include <string.h>
-#include <strings.h>
-#include <stdio.h>
 #include <float.h>
 #include <math.h>
+#include <stdio.h>
+#include <string.h>
+#include <strings.h>
 
-#include "match.h"
 #include "bonus.h"
+#include "match.h"
 
 #include "../config.h"
 

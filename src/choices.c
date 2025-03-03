@@ -1,13 +1,13 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <pthread.h>
-#include <unistd.h>
 #include <errno.h>
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
-#include "options.h"
 #include "choices.h"
 #include "match.h"
+#include "options.h"
 
 /* Initial size of buffer for storing input in memory */
 #define INITIAL_BUFFER_CAPACITY 4096
@@ -60,7 +60,8 @@ void choices_fread(choices_t *c, FILE *file) {
 	c->buffer = safe_realloc(c->buffer, capacity);
 
 	/* Continue reading until we get a "short" read, indicating EOF */
-	while ((c->buffer_size += fread(c->buffer + c->buffer_size, 1, capacity - c->buffer_size, file)) == capacity) {
+	while ((c->buffer_size += fread(c->buffer + c->buffer_size, 1, capacity - c->buffer_size,
+					file)) == capacity) {
 		capacity *= 2;
 		c->buffer = safe_realloc(c->buffer, capacity);
 	}
@@ -192,7 +193,7 @@ static struct result_list merge2(struct result_list list1, struct result_list li
 		abort();
 	}
 
-	while(index1 < list1.size && index2 < list2.size) {
+	while (index1 < list1.size && index2 < list2.size) {
 		if (cmpchoice(&list1.list[index1], &list2.list[index2]) < 0) {
 			result.list[result_index++] = list1.list[index1++];
 		} else {
@@ -200,10 +201,10 @@ static struct result_list merge2(struct result_list list1, struct result_list li
 		}
 	}
 
-	while(index1 < list1.size) {
+	while (index1 < list1.size) {
 		result.list[result_index++] = list1.list[index1++];
 	}
-	while(index2 < list2.size) {
+	while (index2 < list2.size) {
 		result.list[result_index++] = list2.list[index2++];
 	}
 
@@ -221,17 +222,18 @@ static void *choices_search_worker(void *data) {
 
 	size_t start, end;
 
-	for(;;) {
+	for (;;) {
 		worker_get_next_batch(job, &start, &end);
 
-		if(start == end) {
+		if (start == end) {
 			break;
 		}
 
-		for(size_t i = start; i < end; i++) {
+		for (size_t i = start; i < end; i++) {
 			if (has_match(job->search, c->strings[i])) {
 				result->list[result->size].str = c->strings[i];
-				result->list[result->size].score = match(job->search, c->strings[i]);
+				result->list[result->size].score =
+				    match(job->search, c->strings[i]);
 				result->size++;
 			}
 		}
@@ -241,7 +243,7 @@ static void *choices_search_worker(void *data) {
 	qsort(result->list, result->size, sizeof(struct scored_result), cmpchoice);
 
 	/* Fan-in, merging results */
-	for(unsigned int step = 0;; step++) {
+	for (unsigned int step = 0;; step++) {
 		if (w->worker_num % (2 << step))
 			break;
 
@@ -277,10 +279,12 @@ void choices_search(choices_t *c, const char *search) {
 		workers[i].job = job;
 		workers[i].worker_num = i;
 		workers[i].result.size = 0;
-		workers[i].result.list = malloc(c->size * sizeof(struct scored_result)); /* FIXME: This is overkill */
+		workers[i].result.list =
+		    malloc(c->size * sizeof(struct scored_result)); /* FIXME: This is overkill */
 
 		/* These must be created last-to-first to avoid a race condition when fanning in */
-		if ((errno = pthread_create(&workers[i].thread_id, NULL, &choices_search_worker, &workers[i]))) {
+		if ((errno = pthread_create(&workers[i].thread_id, NULL, &choices_search_worker,
+					    &workers[i]))) {
 			perror("pthread_create");
 			exit(EXIT_FAILURE);
 		}
