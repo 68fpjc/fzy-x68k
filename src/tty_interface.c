@@ -44,7 +44,7 @@ static void draw_match(tty_interface_t *state, const char *choice, int selected)
 
 	if (options->show_scores) {
 		if (score == SCORE_MIN) {
-			tty_printf(tty, "(     ) ");
+			tty_fputs(tty, "(     ) ");
 		} else {
 			tty_printf(tty, "(%5.2f) ", score);
 		}
@@ -65,7 +65,7 @@ static void draw_match(tty_interface_t *state, const char *choice, int selected)
 		} else {
 			tty_setfg(tty, TTY_COLOR_NORMAL);
 		}
-		tty_printf(tty, "%c", choice[i]);
+		tty_putc(tty, choice[i]);
 	}
 	tty_setwrap(tty);
 	tty_setnormal(tty);
@@ -87,10 +87,11 @@ static void draw(tty_interface_t *state) {
 		}
 	}
 	tty_setcol(tty, 0);
-	tty_printf(tty, "%s%s", options->prompt, state->search);
+	tty_fputs(tty, options->prompt);
+	tty_fputs(tty, state->search);
 	tty_clearline(tty);
 	for (size_t i = start; i < start + num_lines; i++) {
-		tty_printf(tty, "\n");
+		tty_fputs(tty, "\n");
 		tty_clearline(tty);
 		const char *choice = choices_get(choices, i);
 		if (choice) {
