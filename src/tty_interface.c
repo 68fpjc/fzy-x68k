@@ -116,7 +116,6 @@ static void update_search(tty_interface_t *state) {
 static void update_state(tty_interface_t *state) {
 	if (strcmp(state->last_search, state->search)) {
 		update_search(state);
-		draw(state);
 	}
 }
 
@@ -359,7 +358,7 @@ static void handle_input(tty_interface_t *state, const char *s, int handle_ambig
 		return;
 
 	/* No matching keybinding, add to search */
-	for (int i = 0; input[i]; i++)
+	for (int i = 0; i < input[i]; i++)
 		if (isprint_unicode(input[i]))
 			append_search(state, input[i]);
 
@@ -371,10 +370,12 @@ int tty_interface_run(tty_interface_t *state) {
 	draw(state);
 
 	for (;;) {
+		int need_redraw = 0;
+
 		do {
 			while (!tty_input_ready(state->tty, -1, 1)) {
 				/* We received a signal (probably WINCH) */
-				draw(state);
+				need_redraw = 1;
 			}
 
 			char s[2] = {tty_getchar(state->tty), '\0'};
@@ -383,7 +384,7 @@ int tty_interface_run(tty_interface_t *state) {
 			if (state->exit >= 0)
 				return state->exit;
 
-			draw(state);
+			need_redraw = 1;
 		} while (
 		    tty_input_ready(state->tty, state->ambiguous_key_pending ? KEYTIMEOUT : 0, 0));
 
@@ -393,9 +394,15 @@ int tty_interface_run(tty_interface_t *state) {
 
 			if (state->exit >= 0)
 				return state->exit;
+
+			need_redraw = 1;
 		}
 
 		update_state(state);
+
+		if (need_redraw) {
+			draw(state);
+		}
 	}
 
 	return state->exit;
