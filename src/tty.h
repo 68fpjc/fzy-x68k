@@ -1,13 +1,12 @@
 #ifndef TTY_H
 #define TTY_H TTY_H
 
-#include <termios.h>
-
 typedef struct {
 	int fdin;
 	FILE *fout;
-	struct termios original_termios;
 	int fgcolor;
+	int invert;
+	int sgr;
 	size_t maxwidth;
 	size_t maxheight;
 } tty_t;

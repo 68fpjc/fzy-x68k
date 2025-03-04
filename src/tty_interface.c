@@ -373,21 +373,25 @@ int tty_interface_run(tty_interface_t *state) {
 	for (;;) {
 		int need_redraw = 0;
 
-		do {
-			while (!tty_input_ready(state->tty, -1, 1)) {
-				/* We received a signal (probably WINCH) */
-				need_redraw = 1;
-			}
+		// do {
+		// 	while (!tty_input_ready(state->tty, -1, 1)) {
+		// 		/* We received a signal (probably WINCH) */
+		// 		need_redraw = 1;
+		// 	}
 
 			char s[2] = {tty_getchar(state->tty), '\0'};
 			handle_input(state, s, 0);
+			{
+				tty_putc(state->tty, s[0]);
+				tty_flush(state->tty);
+			}
 
 			if (state->exit >= 0)
 				return state->exit;
 
 			need_redraw = 1;
-		} while (
-		    tty_input_ready(state->tty, state->ambiguous_key_pending ? KEYTIMEOUT : 0, 0));
+		// } while (
+		//     tty_input_ready(state->tty, state->ambiguous_key_pending ? KEYTIMEOUT : 0, 0));
 
 		if (state->ambiguous_key_pending) {
 			char s[1] = "";
