@@ -6,11 +6,79 @@
 #include <x68k/iocs.h>
 
 #include "tty.h"
+#include "ttykey.h"
 
 #include "../config.h"
 
 #define X68K_COLOR_NORMAL 33
 #define X68K_COLOR_HIGHLIGHT 36
+
+// tty_getchar() が呼び出された時点のシフトキーの状態
+static int sftsns;
+
+static int tty_sns_ctrl() {
+	return sftsns & 0x0002;
+}
+
+TTY_KEY tty_to_tty_key(const short ch) {
+	TTY_KEY ret = TTY_KEY_NORMAL;
+	switch (ch) {
+		case 0x1b:
+			ret = TTY_KEY_ESC;
+			break;
+		case 0x08:
+			ret = TTY_KEY_CTRL_H;
+			break;
+		case 0x17:
+			ret = tty_sns_ctrl() ? TTY_KEY_CTRL_W : TTY_KEY_PAGEUP;
+			break;
+		case 0x15:
+			ret = TTY_KEY_CTRL_U;
+			break;
+		case 0x09:
+			ret = TTY_KEY_CTRL_I;
+			break;
+		case 0x03:
+			ret = TTY_KEY_CTRL_C;
+			break;
+		case 0x04:
+			ret = tty_sns_ctrl() ? TTY_KEY_CTRL_D : TTY_KEY_RIGHT;
+			break;
+		case 0x0d:
+			ret = TTY_KEY_CTRL_M;
+			break;
+		case 0x10:
+			ret = TTY_KEY_CTRL_P;
+			break;
+		case 0x0e:
+			ret = TTY_KEY_CTRL_N;
+			break;
+		case 0x0b:
+			ret = TTY_KEY_CTRL_K;
+			break;
+		case 0x0a:
+			ret = TTY_KEY_CTRL_J;
+			break;
+		case 0x01:
+			ret = TTY_KEY_CTRL_A;
+			break;
+		case 0x05:
+			ret = tty_sns_ctrl() ? TTY_KEY_CTRL_E : TTY_KEY_PAGEDOWN;
+			break;
+		case 0x13:
+			ret = TTY_KEY_LEFT;
+			break;
+		case 0x45:
+			ret = TTY_KEY_HOME;
+			break;
+		case 0x06:
+			ret = TTY_KEY_DOWN;
+			break;
+		default:
+			break;
+	}
+	return ret;
+}
 
 void tty_reset(tty_t *tty) {
 	tty_fputs(tty, "\x1b[0m");
@@ -32,13 +100,18 @@ void tty_getwinsz(tty_t *tty) {
 	tty->maxheight = (v & 0xffff) + 1;
 }
 
-char tty_getchar(tty_t *tty) {
+short tty_getchar(tty_t *tty) {
 	static int initialized = 0;
 	if (!initialized) {
 		fclose(stdin);
 		initialized = 1;
 	}
-	return _dos_inkey();
+	short ret = _dos_inkey();
+	if (_dos_keysns()) {
+		ret = ret << 8 | _dos_inkey();
+	}
+	sftsns = _dos_k_sftsns();
+	return ret;
 }
 
 int tty_input_ready(tty_t *tty, long int timeout, int return_on_signal) {

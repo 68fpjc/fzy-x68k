@@ -1,6 +1,8 @@
 #ifndef TTY_H
 #define TTY_H TTY_H
 
+#include "ttykey.h"
+
 typedef struct {
 	int fdin;
 	FILE *fout;
@@ -11,11 +13,12 @@ typedef struct {
 	size_t maxheight;
 } tty_t;
 
+TTY_KEY tty_to_tty_key(const short);
 void tty_reset(tty_t *tty);
 void tty_close(tty_t *tty);
 void tty_init(tty_t *tty, const char *tty_filename);
 void tty_getwinsz(tty_t *tty);
-char tty_getchar(tty_t *tty);
+short tty_getchar(tty_t *tty);
 int tty_input_ready(tty_t *tty, long int timeout, int return_on_signal);
 
 void tty_setfg(tty_t *tty, int fg);

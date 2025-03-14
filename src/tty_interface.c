@@ -246,15 +246,20 @@ static void action_exit(tty_interface_t *state) {
 	state->exit = EXIT_FAILURE;
 }
 
-static void append_search(tty_interface_t *state, char ch) {
+static void append_search(tty_interface_t *state, const short ch) {
 	char *search = state->search;
 	size_t search_size = strlen(search);
-	if (search_size < SEARCH_SIZE_MAX) {
-		memmove(&search[state->cursor + 1], &search[state->cursor],
-			search_size - state->cursor + 1);
-		search[state->cursor] = ch;
-
-		state->cursor++;
+	char ch_high = ch >> 8 & 0xFF;
+	char ch_low = ch & 0xFF;
+	size_t ch_size = ch_high ? 2 : 1;
+	if (search_size + ch_size <= SEARCH_SIZE_MAX) {
+		char *p = search + state->cursor;
+		memmove(p + ch_size, p, search_size - state->cursor + ch_size);
+		if (ch_high) {
+			*p++ = ch_high;
+		}
+		*p = ch_low;
+		state->cursor += ch_size;
 	}
 }
 
@@ -263,9 +268,7 @@ void tty_interface_init(tty_interface_t *state, tty_t *tty, choices_t *choices,
 	state->tty = tty;
 	state->choices = choices;
 	state->options = options;
-	state->ambiguous_key_pending = 0;
 
-	strcpy(state->input, "");
 	strcpy(state->search, "");
 	strcpy(state->last_search, "");
 
@@ -280,134 +283,68 @@ void tty_interface_init(tty_interface_t *state, tty_t *tty, choices_t *choices,
 }
 
 typedef struct {
-	const char *key;
+	const TTY_KEY key;
 	void (*action)(tty_interface_t *);
 } keybinding_t;
 
-#define KEY_CTRL(key) ((const char[]){((key) - ('@')), '\0'})
+static const keybinding_t keybindings[] = {
+    {TTY_KEY_ESC, action_exit},		   /* ESC */
+    {TTY_KEY_CTRL_H, action_del_char},	   /* Backspace (C-H) */
+    {TTY_KEY_CTRL_W, action_del_word},	   /* C-W */
+    {TTY_KEY_CTRL_U, action_del_all},	   /* C-U */
+    {TTY_KEY_CTRL_I, action_autocomplete}, /* TAB (C-I ) */
+    {TTY_KEY_CTRL_C, action_exit},	   /* C-C */
+    {TTY_KEY_CTRL_D, action_exit},	   /* C-D */
+    {TTY_KEY_CTRL_M, action_emit},	   /* CR */
+    {TTY_KEY_CTRL_P, action_prev},	   /* C-P */
+    {TTY_KEY_CTRL_N, action_next},	   /* C-N */
+    {TTY_KEY_CTRL_K, action_prev},	   /* C-K */
+    {TTY_KEY_CTRL_J, action_next},	   /* C-J */
+    {TTY_KEY_CTRL_A, action_beginning},	   /* C-A */
+    {TTY_KEY_CTRL_E, action_end},	   /* C-E */
+    {TTY_KEY_LEFT, action_left},	   /* Left */
+    {TTY_KEY_RIGHT, action_right},	   /* Right */
+    {TTY_KEY_HOME, action_beginning},	   /* Home */
+    {TTY_KEY_PAGEUP, action_pageup},	   /* PageUp */
+    {TTY_KEY_PAGEDOWN, action_pagedown},   /* PageDown */
+    {'\0', NULL}			   /* End of keybindings */
+};
 
-static const keybinding_t keybindings[] = {{"\x1b", action_exit},     /* ESC */
-					   {"\x7f", action_del_char}, /* DEL */
-
-					   {KEY_CTRL('H'), action_del_char}, /* Backspace (C-H) */
-					   {KEY_CTRL('W'), action_del_word}, /* C-W */
-					   {KEY_CTRL('U'), action_del_all},  /* C-U */
-					   {KEY_CTRL('I'), action_autocomplete}, /* TAB (C-I ) */
-					   {KEY_CTRL('C'), action_exit},	 /* C-C */
-					   {KEY_CTRL('D'), action_exit},	 /* C-D */
-					   {KEY_CTRL('M'), action_emit},	 /* CR */
-					   {KEY_CTRL('P'), action_prev},	 /* C-P */
-					   {KEY_CTRL('N'), action_next},	 /* C-N */
-					   {KEY_CTRL('K'), action_prev},	 /* C-K */
-					   {KEY_CTRL('J'), action_next},	 /* C-J */
-					   {KEY_CTRL('A'), action_beginning},	 /* C-A */
-					   {KEY_CTRL('E'), action_end},		 /* C-E */
-
-					   {"\x1bOD", action_left},	  /* LEFT */
-					   {"\x1b[D", action_left},	  /* LEFT */
-					   {"\x1bOC", action_right},	  /* RIGHT */
-					   {"\x1b[C", action_right},	  /* RIGHT */
-					   {"\x1b[1~", action_beginning}, /* HOME */
-					   {"\x1b[H", action_beginning},  /* HOME */
-					   {"\x1b[4~", action_end},	  /* END */
-					   {"\x1b[F", action_end},	  /* END */
-					   {"\x1b[A", action_prev},	  /* UP */
-					   {"\x1bOA", action_prev},	  /* UP */
-					   {"\x1b[B", action_next},	  /* DOWN */
-					   {"\x1bOB", action_next},	  /* DOWN */
-					   {"\x1b[5~", action_pageup},
-					   {"\x1b[6~", action_pagedown},
-					   {"\x1b[200~", action_ignore},
-					   {"\x1b[201~", action_ignore},
-					   {NULL, NULL}};
-
-#undef KEY_CTRL
-
-static void handle_input(tty_interface_t *state, const char *s, int handle_ambiguous_key) {
-	state->ambiguous_key_pending = 0;
-
-	char *input = state->input;
-	strcat(state->input, s);
-
-	/* Figure out if we have completed a keybinding and whether we're in the
-	 * middle of one (both can happen, because of Esc). */
-	int found_keybinding = -1;
-	int in_middle = 0;
-	for (int i = 0; keybindings[i].key; i++) {
-		if (!strcmp(input, keybindings[i].key))
-			found_keybinding = i;
-		else if (!strncmp(input, keybindings[i].key, strlen(state->input)))
-			in_middle = 1;
+static void handle_input(tty_interface_t *state, const short ch) {
+	{
+		/* Figure out if we have completed a keybinding */
+		int found_keybinding = -1;
+		{
+			TTY_KEY ttykey = tty_to_tty_key(ch);
+			for (int i = 0; keybindings[i].action; i++) {
+				if (keybindings[i].key == ttykey) {
+					found_keybinding = i;
+					break;
+				}
+			}
+		}
+		/* If we have an unambiguous keybinding, run it.  */
+		if (found_keybinding != -1) {
+			keybindings[found_keybinding].action(state);
+			return;
+		}
 	}
-
-	/* If we have an unambiguous keybinding, run it.  */
-	if (found_keybinding != -1 && (!in_middle || handle_ambiguous_key)) {
-		keybindings[found_keybinding].action(state);
-		strcpy(input, "");
-		return;
-	}
-
-	/* We could have a complete keybinding, or could be in the middle of one.
-	 * We'll need to wait a few milliseconds to find out. */
-	if (found_keybinding != -1 && in_middle) {
-		state->ambiguous_key_pending = 1;
-		return;
-	}
-
-	/* Wait for more if we are in the middle of a keybinding */
-	if (in_middle)
-		return;
-
 	/* No matching keybinding, add to search */
-	for (int i = 0; i < input[i]; i++)
-		if (isprint_unicode(input[i]))
-			append_search(state, input[i]);
-
-	/* We have processed the input, so clear it */
-	strcpy(input, "");
+	if (isprint_unicode(ch))
+		append_search(state, ch);
 }
 
 int tty_interface_run(tty_interface_t *state) {
 	draw(state);
 
 	for (;;) {
-		int need_redraw = 0;
+		handle_input(state, tty_getchar(state->tty));
 
-		// do {
-		// 	while (!tty_input_ready(state->tty, -1, 1)) {
-		// 		/* We received a signal (probably WINCH) */
-		// 		need_redraw = 1;
-		// 	}
-
-			char s[2] = {tty_getchar(state->tty), '\0'};
-			handle_input(state, s, 0);
-			{
-				tty_putc(state->tty, s[0]);
-				tty_flush(state->tty);
-			}
-
-			if (state->exit >= 0)
-				return state->exit;
-
-			need_redraw = 1;
-		// } while (
-		//     tty_input_ready(state->tty, state->ambiguous_key_pending ? KEYTIMEOUT : 0, 0));
-
-		if (state->ambiguous_key_pending) {
-			char s[1] = "";
-			handle_input(state, s, 1);
-
-			if (state->exit >= 0)
-				return state->exit;
-
-			need_redraw = 1;
-		}
+		if (state->exit >= 0)
+			return state->exit;
 
 		update_state(state);
-
-		if (need_redraw) {
-			draw(state);
-		}
+		draw(state);
 	}
 
 	return state->exit;
