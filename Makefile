@@ -1,58 +1,28 @@
 VERSION=1.0
 
-CC=m68k-xelf-gcc
-CPPFLAGS=-DVERSION=\"${VERSION}\" -D_GNU_SOURCE
-CFLAGS+=-Wall -Wextra -g -std=c99 -O0 -pedantic -Ideps
-PREFIX?=/usr/local
-MANDIR?=$(PREFIX)/share/man
-BINDIR?=$(PREFIX)/bin
-DEBUGGER?=
+TARGET = fzy.x
 
-INSTALL=install
-INSTALL_PROGRAM=$(INSTALL)
-INSTALL_DATA=${INSTALL} -m 644
+CC = m68k-xelf-gcc
+LD = $(CC)
+CFLAGS =-Wall -Wextra -g -std=c99 -O0 -pedantic -DVERSION=\"${VERSION}\" -D_GNU_SOURCE -MMD
+LDLIBS =
 
-LIBS=
-OBJECTS=src/fzy.o src/match.o src/tty.o src/choices.o src/options.o src/tty_interface.o
-THEFTDEPS = deps/theft/theft.o deps/theft/theft_bloom.o deps/theft/theft_mt.o deps/theft/theft_hash.o
-TESTOBJECTS=test/fzytest.c test/test_properties.c test/test_choices.c test/test_match.c src/match.o src/choices.o src/options.o $(THEFTDEPS)
+OBJS=src/fzy.o src/match.o src/tty.o src/choices.o src/options.o src/tty_interface.o
+DEPS = $(patsubst %.o,%.d,$(OBJS))
 
-all: fzy.x
+.PHONY: all configh clean
 
-test/fzytest: $(TESTOBJECTS)
-	$(CC) $(CFLAGS) $(CCFLAGS) -Isrc -o $@ $(TESTOBJECTS) $(LIBS)
+all: gen_config_h $(TARGET)
 
-acceptance: fzy.x
-	cd test/acceptance && bundle --quiet && bundle exec ruby acceptance_test.rb
+$(TARGET): $(OBJS)
+	$(LD) $^ $(LDLIBS) -o $@
 
-test: check
-check: test/fzytest
-	$(DEBUGGER) ./test/fzytest
+-include $(DEPS)
 
-fzy.x: $(OBJECTS)
-	$(CC) $(CFLAGS) $(CCFLAGS) -o $@ $(OBJECTS) $(LIBS)
+gen_config_h: config.h
 
-%.o: %.c config.h
-	$(CC) $(CPPFLAGS) $(CFLAGS) -c -o $@ $<
-
-config.h:
-	cp src/config.def.h config.h
-
-install: fzy.x
-	mkdir -p $(DESTDIR)$(BINDIR)
-	cp fzy.x $(DESTDIR)$(BINDIR)/
-	chmod 755 ${DESTDIR}${BINDIR}/fzy.x
-	mkdir -p $(DESTDIR)$(MANDIR)/man1
-	cp fzy.1 $(DESTDIR)$(MANDIR)/man1/
-	chmod 644 ${DESTDIR}${MANDIR}/man1/fzy.1
-
-fmt:
-	clang-format -i src/*.c src/*.h
+config.h: src/config.def.h
+	cp $< $@
 
 clean:
-	rm -f fzy.x test/fzytest src/*.o deps/*/*.o
-
-veryclean: clean
-	rm -f config.h
-
-.PHONY: test check all clean veryclean install fmt acceptance
+	-rm -f $(TARGET) src/*.o *.elf* src/*.d config.h
