@@ -8,8 +8,6 @@
 #include "tty.h"
 #include "ttykey.h"
 
-#include "../config.h"
-
 #define X68K_COLOR_NORMAL 33
 #define X68K_COLOR_HIGHLIGHT 36
 

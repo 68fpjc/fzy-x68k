@@ -1,4 +1,5 @@
 #include <ctype.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,12 +8,27 @@
 #include "match.h"
 #include "tty_interface.h"
 
-static int isprint_unicode(char c) {
-	return isprint(c) || c & (1 << 7);
+static int is_cp932_lead_byte(const char c) {
+	uint8_t tmp = c;
+	int ret = (tmp >= 0x81 && tmp <= 0x9F) || (tmp >= 0xE0 && tmp <= 0xFC);
+	return ret;
 }
 
-static int is_boundary(char c) {
-	return ~c & (1 << 7) || c & (1 << 6);
+static int is_print_cp932(const short ch) {
+	char ch_high = ch >> 8 & 0xFF;
+	return ch_high ? is_cp932_lead_byte(ch_high) : ch >= 0x20;
+}
+
+static size_t prev_cursor(tty_interface_t *state) {
+	size_t ret = 0;
+	{
+		size_t tmp = 0;
+		while (tmp < state->cursor) {
+			ret = tmp;
+			tmp += is_cp932_lead_byte(state->search[tmp]) ? 2 : 1;
+		}
+	}
+	return ret;
 }
 
 static void clear(tty_interface_t *state) {
@@ -147,11 +163,7 @@ static void action_del_char(tty_interface_t *state) {
 		return;
 	}
 	size_t original_cursor = state->cursor;
-
-	do {
-		state->cursor--;
-	} while (!is_boundary(state->search[state->cursor]) && state->cursor);
-
+	state->cursor = prev_cursor(state);
 	memmove(&state->search[state->cursor], &state->search[original_cursor],
 		length - original_cursor + 1);
 }
@@ -192,18 +204,12 @@ static void action_next(tty_interface_t *state) {
 }
 
 static void action_left(tty_interface_t *state) {
-	if (state->cursor > 0) {
-		state->cursor--;
-		while (!is_boundary(state->search[state->cursor]) && state->cursor)
-			state->cursor--;
-	}
+	state->cursor = prev_cursor(state);
 }
 
 static void action_right(tty_interface_t *state) {
 	if (state->cursor < strlen(state->search)) {
-		state->cursor++;
-		while (!is_boundary(state->search[state->cursor]))
-			state->cursor++;
+		state->cursor += is_cp932_lead_byte(state->search[state->cursor]) ? 2 : 1;
 	}
 }
 
@@ -330,8 +336,9 @@ static void handle_input(tty_interface_t *state, const short ch) {
 		}
 	}
 	/* No matching keybinding, add to search */
-	if (isprint_unicode(ch))
+	if (is_print_cp932(ch)) {
 		append_search(state, ch);
+	}
 }
 
 int tty_interface_run(tty_interface_t *state) {
