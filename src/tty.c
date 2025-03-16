@@ -99,14 +99,9 @@ void tty_getwinsz(tty_t *tty) {
 }
 
 short tty_getchar(tty_t *tty) {
-	static int initialized = 0;
-	if (!initialized) {
-		fclose(stdin);
-		initialized = 1;
-	}
-	short ret = _dos_inkey();
-	if (_dos_keysns()) {
-		ret = ret << 8 | _dos_inkey();
+	short ret = _dos_k_keyinp();
+	if (_dos_k_keysns()) {
+		ret = ret << 8 | _dos_k_keyinp();
 	}
 	sftsns = _dos_k_sftsns();
 	return ret;
