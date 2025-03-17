@@ -39,6 +39,18 @@ void tty_setwrap(tty_t *tty);
 #define TTY_COLOR_NORMAL 9
 
 /*
+ * tty_save_cursor
+ * Save the current cursor position.
+ */
+void tty_save_cursor(tty_t *);
+
+/*
+ * tty_restore_cursor
+ * Restore the cursor to the last saved position.
+ */
+void tty_restore_cursor(tty_t *);
+
+/*
  * tty_carriagereturn
  * Move the cursor to the beginning of the current line.
  */

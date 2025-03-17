@@ -123,20 +123,27 @@ static void draw_results(tty_interface_t *state) {
 			draw_match(state, choice, i == choices->selection);
 		}
 	}
-	if (num_lines > 0) {
-		tty_moveup(tty, num_lines);
-	}
 }
 
 static void draw(tty_interface_t *state) {
-	draw_results(state);
-	draw_prompt_and_search(state);
+	if (state->redraw_results) {
+		tty_save_cursor(state->tty);
+		draw_results(state);
+		tty_restore_cursor(state->tty);
+		state->redraw_results = 0;
+	}
+	if (state->redraw_prompt_and_search) {
+		draw_prompt_and_search(state);
+		state->redraw_prompt_and_search = 0;
+	}
 	tty_flush(state->tty);
 }
 
 static void update_search(tty_interface_t *state) {
 	choices_search(state->choices, state->search);
 	strcpy(state->last_search, state->search);
+	state->redraw_results = 1;
+	state->redraw_prompt_and_search = 1;
 }
 
 static void update_state(tty_interface_t *state) {
@@ -201,6 +208,7 @@ static void action_del_all(tty_interface_t *state) {
 static void action_prev(tty_interface_t *state) {
 	update_state(state);
 	choices_prev(state->choices);
+	state->redraw_results = 1;
 }
 
 static void action_ignore(tty_interface_t *state) {
@@ -210,30 +218,44 @@ static void action_ignore(tty_interface_t *state) {
 static void action_next(tty_interface_t *state) {
 	update_state(state);
 	choices_next(state->choices);
+	state->redraw_results = 1;
 }
 
 static void action_left(tty_interface_t *state) {
-	state->cursor = prev_cursor(state);
+	size_t cursor = prev_cursor(state);
+	if (cursor != state->cursor) {
+		state->cursor = cursor;
+		state->redraw_prompt_and_search = 1;
+	}
 }
 
 static void action_right(tty_interface_t *state) {
 	if (state->cursor < strlen(state->search)) {
 		state->cursor += is_cp932_lead_byte(state->search[state->cursor]) ? 2 : 1;
+		state->redraw_prompt_and_search = 1;
 	}
 }
 
 static void action_beginning(tty_interface_t *state) {
-	state->cursor = 0;
+	if (state->cursor) {
+		state->cursor = 0;
+		state->redraw_prompt_and_search = 1;
+	}
 }
 
 static void action_end(tty_interface_t *state) {
-	state->cursor = strlen(state->search);
+	size_t cursor = strlen(state->search);
+	if (cursor != state->cursor) {
+		state->cursor = cursor;
+		state->redraw_prompt_and_search = 1;
+	}
 }
 
 static void action_pageup(tty_interface_t *state) {
 	update_state(state);
 	for (size_t i = 0; i < state->options->num_lines && state->choices->selection > 0; i++)
 		choices_prev(state->choices);
+	state->redraw_results = 1;
 }
 
 static void action_pagedown(tty_interface_t *state) {
@@ -242,6 +264,7 @@ static void action_pagedown(tty_interface_t *state) {
 			   state->choices->selection < state->choices->available - 1;
 	     i++)
 		choices_next(state->choices);
+	state->redraw_results = 1;
 }
 
 static void action_autocomplete(tty_interface_t *state) {
@@ -288,6 +311,8 @@ void tty_interface_init(tty_interface_t *state, tty_t *tty, choices_t *choices,
 	strcpy(state->last_search, "");
 
 	state->exit = -1;
+	state->redraw_prompt_and_search = 1;
+	state->redraw_results = 1;
 
 	if (options->init_search)
 		strncpy(state->search, options->init_search, SEARCH_SIZE_MAX);

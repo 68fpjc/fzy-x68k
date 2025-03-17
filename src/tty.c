@@ -175,6 +175,14 @@ void tty_setwrap(tty_t *tty) {
 	// not supported
 }
 
+void tty_save_cursor(tty_t *tty) {
+	tty_fputs(tty, "\x1b[s");
+}
+
+void tty_restore_cursor(tty_t *tty) {
+	tty_fputs(tty, "\x1b[u");
+}
+
 void tty_carriagereturn(tty_t *tty) {
 	tty_putc(tty, '\r');
 }
