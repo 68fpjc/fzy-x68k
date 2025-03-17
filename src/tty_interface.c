@@ -33,16 +33,8 @@ static size_t prev_cursor(tty_interface_t *state) {
 
 static void clear(tty_interface_t *state) {
 	tty_t *tty = state->tty;
-
-	tty_setcol(tty, 0);
-	size_t line = 0;
-	while (line++ < state->options->num_lines) {
-		tty_newline(tty);
-	}
-	tty_clearline(tty);
-	if (state->options->num_lines > 0) {
-		tty_moveup(tty, line - 1);
-	}
+	tty_carriagereturn(tty);
+	tty_clearend(tty);
 	tty_flush(tty);
 }
 
@@ -87,7 +79,27 @@ static void draw_match(tty_interface_t *state, const char *choice, int selected)
 	tty_setnormal(tty);
 }
 
-static void draw(tty_interface_t *state) {
+static void draw_prompt_and_search(tty_interface_t *state) {
+	tty_t *tty = state->tty;
+	options_t *options = state->options;
+
+	// TODO どうにかしたい
+
+	// プロンプトを描画して
+	tty_carriagereturn(tty);
+	tty_fputs(tty, options->prompt);
+	tty_clearline(tty);
+	// クエリ全体を描画して
+	tty_fputs(tty, state->search);
+	tty_carriagereturn(tty);
+	// またプロンプトを描画して
+	tty_fputs(tty, options->prompt);
+	// クエリのカーソル位置まで描画する
+	for (size_t i = 0; i < state->cursor; i++)
+		tty_putc(tty, state->search[i]);
+}
+
+static void draw_results(tty_interface_t *state) {
 	tty_t *tty = state->tty;
 	choices_t *choices = state->choices;
 	options_t *options = state->options;
@@ -102,12 +114,9 @@ static void draw(tty_interface_t *state) {
 			start = available - num_lines;
 		}
 	}
-	tty_setcol(tty, 0);
-	tty_fputs(tty, options->prompt);
-	tty_fputs(tty, state->search);
-	tty_clearline(tty);
 	for (size_t i = start; i < start + num_lines; i++) {
-		tty_fputs(tty, "\n");
+		tty_carriagereturn(tty);
+		tty_linefeed(tty);
 		tty_clearline(tty);
 		const char *choice = choices_get(choices, i);
 		if (choice) {
@@ -117,12 +126,12 @@ static void draw(tty_interface_t *state) {
 	if (num_lines > 0) {
 		tty_moveup(tty, num_lines);
 	}
+}
 
-	tty_setcol(tty, 0);
-	tty_fputs(tty, options->prompt);
-	for (size_t i = 0; i < state->cursor; i++)
-		tty_putc(tty, state->search[i]);
-	tty_flush(tty);
+static void draw(tty_interface_t *state) {
+	draw_results(state);
+	draw_prompt_and_search(state);
+	tty_flush(state->tty);
 }
 
 static void update_search(tty_interface_t *state) {

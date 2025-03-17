@@ -175,19 +175,20 @@ void tty_setwrap(tty_t *tty) {
 	// not supported
 }
 
-void tty_newline(tty_t *tty) {
-	tty_fputs(tty, "\x1b[K\n");
+void tty_carriagereturn(tty_t *tty) {
+	tty_putc(tty, '\r');
+}
+
+void tty_linefeed(tty_t *tty) {
+	tty_putc(tty, '\n');
 }
 
 void tty_clearline(tty_t *tty) {
 	tty_fputs(tty, "\x1b[K");
 }
 
-void tty_setcol(tty_t *tty, int col) {
-	tty_putc(tty, '\r');
-	if (col > 0) {
-		tty_printf(tty, "\x1b[%iC", col + 1);
-	}
+void tty_clearend(tty_t *tty) {
+	tty_fputs(tty, "\x1b[J");
 }
 
 void tty_moveup(tty_t *tty, int i) {
