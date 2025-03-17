@@ -17,8 +17,9 @@ typedef struct {
 	size_t cursor;
 
 	int exit;
-	int redraw_prompt_and_search; // プロンプトとクエリの再描画が必要
-	int redraw_results;           // 検索結果リストの再描画が必要
+	int redraw_query;	 // プロンプトとクエリの再描画が必要
+	int redraw_results;	 // 検索結果リストの再描画が必要
+	tty_cursor_t query_home; // カーソルの位置
 } tty_interface_t;
 
 void tty_interface_init(tty_interface_t *state, tty_t *tty, choices_t *choices, options_t *options);

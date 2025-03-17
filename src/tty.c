@@ -92,7 +92,17 @@ void tty_init(tty_t *tty, const char *tty_filename) {
 	tty_setnormal(tty);
 }
 
+void tty_alloc(tty_t *tty, unsigned int num_lines) {
+	for (int i = 0; i < num_lines; i++) {
+		tty_linefeed(tty);
+	}
+	for (int i = 0; i < num_lines; i++) {
+		tty_backline(tty);
+	}
+}
+
 void tty_getwinsz(tty_t *tty) {
+	// TODO 本当はカーソルを右下へ移動して DOS _CONCTRL (MD: 3) を使いたい
 	int v = _iocs_b_consol(-1, -1, -1, -1);
 	tty->maxwidth = (v >> 16) + 1;
 	tty->maxheight = (v & 0xffff) + 1;
@@ -105,6 +115,16 @@ short tty_getchar(tty_t *tty) {
 	}
 	sftsns = _dos_k_sftsns();
 	return ret;
+}
+
+tty_cursor_t tty_getcursor(tty_t *tty) {
+	tty_flush(tty);
+	// TODO 本当は DOS _CONCTRL (MD: 3) を使いたい
+	return _iocs_b_locate(-1, -1);
+}
+
+void tty_setcursor(tty_t *tty, tty_cursor_t cursor) {
+	tty_printf(tty, "\x1b[%d;%dH", (cursor & 0xffff) + 1, (cursor >> 16) + 1);
 }
 
 int tty_input_ready(tty_t *tty, long int timeout, int return_on_signal) {
@@ -175,20 +195,16 @@ void tty_setwrap(tty_t *tty) {
 	// not supported
 }
 
-void tty_save_cursor(tty_t *tty) {
-	tty_fputs(tty, "\x1b[s");
-}
-
-void tty_restore_cursor(tty_t *tty) {
-	tty_fputs(tty, "\x1b[u");
-}
-
 void tty_carriagereturn(tty_t *tty) {
 	tty_putc(tty, '\r');
 }
 
 void tty_linefeed(tty_t *tty) {
 	tty_putc(tty, '\n');
+}
+
+void tty_backline(tty_t *tty) {
+	tty_printf(tty, "\x1b[A");
 }
 
 void tty_clearline(tty_t *tty) {
@@ -204,14 +220,11 @@ void tty_moveup(tty_t *tty, int i) {
 }
 
 void tty_printf(tty_t *tty, const char *fmt, ...) {
+	char buf[64];
 	va_list args;
 	va_start(args, fmt);
-	{
-		char *p;
-		vasprintf(&p, fmt, args);
-		tty_fputs(tty, p);
-		free(p);
-	}
+	vsnprintf(buf, sizeof(buf), fmt, args);
+	tty_fputs(tty, buf);
 	va_end(args);
 }
 

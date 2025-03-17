@@ -79,22 +79,26 @@ static void draw_match(tty_interface_t *state, const char *choice, int selected)
 	tty_setnormal(tty);
 }
 
-static void draw_prompt_and_search(tty_interface_t *state) {
+static void draw_prompt(tty_interface_t *state) {
+	tty_t *tty = state->tty;
+	options_t *options = state->options;
+	tty_fputs(tty, options->prompt);
+}
+
+static void draw_query(tty_interface_t *state) {
 	tty_t *tty = state->tty;
 	options_t *options = state->options;
 
 	// TODO どうにかしたい
 
-	// プロンプトを描画して
-	tty_carriagereturn(tty);
-	tty_fputs(tty, options->prompt);
-	tty_clearline(tty);
+	// カーソルを先頭に移動して
+	tty_setcursor(tty, state->query_home);
 	// クエリ全体を描画して
 	tty_fputs(tty, state->search);
-	tty_carriagereturn(tty);
-	// またプロンプトを描画して
-	tty_fputs(tty, options->prompt);
-	// クエリのカーソル位置まで描画する
+	tty_clearline(tty);
+	// またカーソルを先頭に移動して
+	tty_setcursor(tty, state->query_home);
+	// クエリのカーソル位置の前まで描画する
 	for (size_t i = 0; i < state->cursor; i++)
 		tty_putc(tty, state->search[i]);
 }
@@ -127,14 +131,14 @@ static void draw_results(tty_interface_t *state) {
 
 static void draw(tty_interface_t *state) {
 	if (state->redraw_results) {
-		tty_save_cursor(state->tty);
+		tty_cursor_t cursor = tty_getcursor(state->tty);
 		draw_results(state);
-		tty_restore_cursor(state->tty);
+		tty_setcursor(state->tty, cursor);
 		state->redraw_results = 0;
 	}
-	if (state->redraw_prompt_and_search) {
-		draw_prompt_and_search(state);
-		state->redraw_prompt_and_search = 0;
+	if (state->redraw_query) {
+		draw_query(state);
+		state->redraw_query = 0;
 	}
 	tty_flush(state->tty);
 }
@@ -143,7 +147,7 @@ static void update_search(tty_interface_t *state) {
 	choices_search(state->choices, state->search);
 	strcpy(state->last_search, state->search);
 	state->redraw_results = 1;
-	state->redraw_prompt_and_search = 1;
+	state->redraw_query = 1;
 }
 
 static void update_state(tty_interface_t *state) {
@@ -225,21 +229,21 @@ static void action_left(tty_interface_t *state) {
 	size_t cursor = prev_cursor(state);
 	if (cursor != state->cursor) {
 		state->cursor = cursor;
-		state->redraw_prompt_and_search = 1;
+		state->redraw_query = 1;
 	}
 }
 
 static void action_right(tty_interface_t *state) {
 	if (state->cursor < strlen(state->search)) {
 		state->cursor += is_cp932_lead_byte(state->search[state->cursor]) ? 2 : 1;
-		state->redraw_prompt_and_search = 1;
+		state->redraw_query = 1;
 	}
 }
 
 static void action_beginning(tty_interface_t *state) {
 	if (state->cursor) {
 		state->cursor = 0;
-		state->redraw_prompt_and_search = 1;
+		state->redraw_query = 1;
 	}
 }
 
@@ -247,7 +251,7 @@ static void action_end(tty_interface_t *state) {
 	size_t cursor = strlen(state->search);
 	if (cursor != state->cursor) {
 		state->cursor = cursor;
-		state->redraw_prompt_and_search = 1;
+		state->redraw_query = 1;
 	}
 }
 
@@ -311,7 +315,7 @@ void tty_interface_init(tty_interface_t *state, tty_t *tty, choices_t *choices,
 	strcpy(state->last_search, "");
 
 	state->exit = -1;
-	state->redraw_prompt_and_search = 1;
+	state->redraw_query = 1;
 	state->redraw_results = 1;
 
 	if (options->init_search)
@@ -376,6 +380,10 @@ static void handle_input(tty_interface_t *state, const short ch) {
 }
 
 int tty_interface_run(tty_interface_t *state) {
+	tty_alloc(state->tty, state->options->num_lines);
+	draw_prompt(state);
+	state->query_home = tty_getcursor(state->tty);
+
 	draw(state);
 
 	for (;;) {

@@ -13,12 +13,33 @@ typedef struct {
 	size_t maxheight;
 } tty_t;
 
+/*
+ * tty_cursor_t
+ * A cursor position on the tty.
+ */
+typedef int tty_cursor_t;
+
 TTY_KEY tty_to_tty_key(const short);
 void tty_reset(tty_t *tty);
 void tty_close(tty_t *tty);
 void tty_init(tty_t *tty, const char *tty_filename);
+/*
+ * tty_alloc
+ * Allocate a number of lines on the tty.
+ */
+void tty_alloc(tty_t *, unsigned int);
 void tty_getwinsz(tty_t *tty);
 short tty_getchar(tty_t *tty);
+/*
+ * tty_getcursor
+ * Get the current cursor position.
+ */
+tty_cursor_t tty_getcursor(tty_t *);
+/*
+ * tty_setcursor
+ * Set the cursor position.
+ */
+void tty_setcursor(tty_t *, tty_cursor_t);
 int tty_input_ready(tty_t *tty, long int timeout, int return_on_signal);
 
 void tty_setfg(tty_t *tty, int fg);
@@ -39,18 +60,6 @@ void tty_setwrap(tty_t *tty);
 #define TTY_COLOR_NORMAL 9
 
 /*
- * tty_save_cursor
- * Save the current cursor position.
- */
-void tty_save_cursor(tty_t *);
-
-/*
- * tty_restore_cursor
- * Restore the cursor to the last saved position.
- */
-void tty_restore_cursor(tty_t *);
-
-/*
  * tty_carriagereturn
  * Move the cursor to the beginning of the current line.
  */
@@ -61,6 +70,12 @@ void tty_carriagereturn(tty_t *);
  * Move the cursor to the beginning of the next line.
  */
 void tty_linefeed(tty_t *);
+
+/*
+ * tty_backline
+ * Move the cursor to the beginning of the previous line.
+ */
+void tty_backline(tty_t *);
 
 /* tty_clearline
  * Clear to the end of the current line without advancing the cursor.
