@@ -100,7 +100,7 @@ void tty_getwinsz(tty_t *tty) {
 
 short tty_getchar(tty_t *tty) {
 	short ret = _dos_k_keyinp();
-	if (_dos_k_keysns()) {
+	if (is_cp932_lead_byte(ret)) {
 		ret = ret << 8 | _dos_k_keyinp();
 	}
 	sftsns = _dos_k_sftsns();

@@ -8,7 +8,7 @@
 #include "match.h"
 #include "tty_interface.h"
 
-static int is_cp932_lead_byte(const char c) {
+int is_cp932_lead_byte(const char c) {
 	uint8_t tmp = c;
 	int ret = (tmp >= 0x81 && tmp <= 0x9F) || (tmp >= 0xE0 && tmp <= 0xFC);
 	return ret;
