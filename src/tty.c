@@ -11,6 +11,18 @@
 #define X68K_COLOR_NORMAL 33
 #define X68K_COLOR_HIGHLIGHT 36
 
+int _dos_kflushonly() {
+	int ret;
+	__asm__ volatile(
+	    // MODE = -1 の技は ED.X が使っている
+	    "move.w	#-1, %%sp@-\n"
+	    ".short	0xff0c\n"
+	    "addq.l	#2, %%sp\n"
+	    : "=d"(ret) // Output operand to capture d0
+	);
+	return ret;
+}
+
 // tty_getchar() が呼び出された時点のシフトキーの状態
 static int sftsns;
 
@@ -109,6 +121,12 @@ void tty_getwinsz(tty_t *tty) {
 }
 
 short tty_getchar(tty_t *tty) {
+	static int initialized = 0;
+	if (!initialized) {
+		fclose(stdin); // これをしないと _dos_kflushonly() が効かない？
+		initialized = 1;
+	}
+	_dos_kflushonly();
 	short ret = _dos_k_keyinp();
 	if (is_cp932_lead_byte(ret)) {
 		ret = ret << 8 | _dos_k_keyinp();
