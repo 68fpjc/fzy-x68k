@@ -316,8 +316,6 @@ void tty_interface_init(tty_interface_t *state, tty_t *tty, choices_t *choices,
 	strcpy(state->last_search, "");
 
 	state->exit = -1;
-	state->redraw_search = 1;
-	state->redraw_results = 1;
 
 	if (options->init_search)
 		strncpy(state->search, options->init_search, SEARCH_SIZE_MAX);
