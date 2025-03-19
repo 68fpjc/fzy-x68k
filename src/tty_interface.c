@@ -207,6 +207,7 @@ static void action_del_all(tty_interface_t *state) {
 	memmove(state->search, &state->search[state->cursor],
 		strlen(state->search) - state->cursor + 1);
 	state->cursor = 0;
+	state->redraw_query = 1;
 }
 
 static void action_prev(tty_interface_t *state) {
