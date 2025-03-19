@@ -15,9 +15,9 @@ int is_cp932_lead_byte(const char c) {
 	return ret;
 }
 
-static int is_print_cp932(const short ch) {
-	char ch_high = ch >> 8;
-	return ch_high ? is_cp932_lead_byte(ch_high) : ch >= 0x20;
+static int is_print_cp932(const short wc) {
+	char wc_high = wc >> 8;
+	return wc_high ? is_cp932_lead_byte(wc_high) : wc >= 0x20;
 }
 
 static size_t prev_cursor(tty_interface_t *state) {
@@ -86,19 +86,19 @@ static void draw_prompt(tty_interface_t *state) {
 	tty_fputs(tty, options->prompt);
 }
 
-static void draw_query(tty_interface_t *state) {
+static void draw_search(tty_interface_t *state) {
 	tty_t *tty = state->tty;
 	options_t *options = state->options;
 
 	// TODO どうにかしたい
 
 	// カーソルを先頭に移動して
-	tty_setcursor(tty, state->query_home);
+	tty_setcursor(tty, state->search_home);
 	// クエリ全体を描画して
 	tty_fputs(tty, state->search);
 	tty_clearline(tty);
 	// またカーソルを先頭に移動して
-	tty_setcursor(tty, state->query_home);
+	tty_setcursor(tty, state->search_home);
 	// クエリのカーソル位置の前まで描画する
 	for (size_t i = 0; i < state->cursor; i++)
 		tty_putc(tty, state->search[i]);
@@ -131,9 +131,9 @@ static void draw_results(tty_interface_t *state) {
 }
 
 static void draw(tty_interface_t *state) {
-	if (state->redraw_query) {
-		draw_query(state);
-		state->redraw_query = 0;
+	if (state->redraw_search) {
+		draw_search(state);
+		state->redraw_search = 0;
 	}
 	if (state->redraw_results) {
 		tty_cursor_t cursor = tty_getcursor(state->tty);
@@ -148,7 +148,7 @@ static void update_search(tty_interface_t *state) {
 	choices_search(state->choices, state->search);
 	strcpy(state->last_search, state->search);
 	state->redraw_results = 1;
-	state->redraw_query = 1;
+	state->redraw_search = 1;
 }
 
 static int is_search_dirty(tty_interface_t *state) {
@@ -212,7 +212,7 @@ static void action_del_all(tty_interface_t *state) {
 	memmove(state->search, &state->search[state->cursor],
 		strlen(state->search) - state->cursor + 1);
 	state->cursor = 0;
-	state->redraw_query = 1;
+	state->redraw_search = 1;
 }
 
 static void action_prev(tty_interface_t *state) {
@@ -233,21 +233,21 @@ static void action_left(tty_interface_t *state) {
 	size_t cursor = prev_cursor(state);
 	if (cursor != state->cursor) {
 		state->cursor = cursor;
-		state->redraw_query = 1;
+		state->redraw_search = 1;
 	}
 }
 
 static void action_right(tty_interface_t *state) {
 	if (state->cursor < strlen(state->search)) {
 		state->cursor += is_cp932_lead_byte(state->search[state->cursor]) ? 2 : 1;
-		state->redraw_query = 1;
+		state->redraw_search = 1;
 	}
 }
 
 static void action_beginning(tty_interface_t *state) {
 	if (state->cursor) {
 		state->cursor = 0;
-		state->redraw_query = 1;
+		state->redraw_search = 1;
 	}
 }
 
@@ -255,7 +255,7 @@ static void action_end(tty_interface_t *state) {
 	size_t cursor = strlen(state->search);
 	if (cursor != state->cursor) {
 		state->cursor = cursor;
-		state->redraw_query = 1;
+		state->redraw_search = 1;
 	}
 }
 
@@ -289,19 +289,19 @@ static void action_exit(tty_interface_t *state) {
 	state->exit = EXIT_FAILURE;
 }
 
-static void append_search(tty_interface_t *state, const short ch) {
+static void append_search(tty_interface_t *state, const short wc) {
 	char *search = state->search;
 	size_t search_size = strlen(search);
-	char ch_high = ch >> 8;
-	char ch_low = ch & 0xFF;
-	size_t ch_size = ch_high ? 2 : 1;
+	char wc_high = wc >> 8;
+	char wc_low = wc & 0xFF;
+	size_t ch_size = wc_high ? 2 : 1;
 	if (search_size + ch_size <= SEARCH_SIZE_MAX) {
 		char *p = search + state->cursor;
 		memmove(p + ch_size, p, search_size - state->cursor + ch_size);
-		if (ch_high) {
-			*p++ = ch_high;
+		if (wc_high) {
+			*p++ = wc_high;
 		}
-		*p = ch_low;
+		*p = wc_low;
 		state->cursor += ch_size;
 	}
 }
@@ -316,7 +316,7 @@ void tty_interface_init(tty_interface_t *state, tty_t *tty, choices_t *choices,
 	strcpy(state->last_search, "");
 
 	state->exit = -1;
-	state->redraw_query = 1;
+	state->redraw_search = 1;
 	state->redraw_results = 1;
 
 	if (options->init_search)
@@ -385,7 +385,7 @@ static void handle_input(tty_interface_t *state, const short wc) {
 int tty_interface_run(tty_interface_t *state) {
 	tty_alloc(state->tty, state->options->num_lines);
 	draw_prompt(state);
-	state->query_home = tty_getcursor(state->tty);
+	state->search_home = tty_getcursor(state->tty);
 
 	draw(state);
 
