@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "../config.h"
 #include "match.h"
@@ -15,7 +16,7 @@ int is_cp932_lead_byte(const char c) {
 }
 
 static int is_print_cp932(const short ch) {
-	char ch_high = ch >> 8 & 0xFF;
+	char ch_high = ch >> 8;
 	return ch_high ? is_cp932_lead_byte(ch_high) : ch >= 0x20;
 }
 
@@ -130,15 +131,15 @@ static void draw_results(tty_interface_t *state) {
 }
 
 static void draw(tty_interface_t *state) {
+	if (state->redraw_query) {
+		draw_query(state);
+		state->redraw_query = 0;
+	}
 	if (state->redraw_results) {
 		tty_cursor_t cursor = tty_getcursor(state->tty);
 		draw_results(state);
 		tty_setcursor(state->tty, cursor);
 		state->redraw_results = 0;
-	}
-	if (state->redraw_query) {
-		draw_query(state);
-		state->redraw_query = 0;
 	}
 	tty_flush(state->tty);
 }
@@ -150,15 +151,19 @@ static void update_search(tty_interface_t *state) {
 	state->redraw_query = 1;
 }
 
-static void update_state(tty_interface_t *state) {
-	if (strcmp(state->last_search, state->search)) {
+static int is_search_dirty(tty_interface_t *state) {
+	return strcmp(state->last_search, state->search);
+}
+
+static int update_state(tty_interface_t *state) {
+	int ret = is_search_dirty(state);
+	if (ret) {
 		update_search(state);
 	}
+	return ret;
 }
 
 static void action_emit(tty_interface_t *state) {
-	update_state(state);
-
 	/* Reset the tty as close as possible to the previous state */
 	clear(state);
 
@@ -211,7 +216,6 @@ static void action_del_all(tty_interface_t *state) {
 }
 
 static void action_prev(tty_interface_t *state) {
-	update_state(state);
 	choices_prev(state->choices);
 	state->redraw_results = 1;
 }
@@ -221,7 +225,6 @@ static void action_ignore(tty_interface_t *state) {
 }
 
 static void action_next(tty_interface_t *state) {
-	update_state(state);
 	choices_next(state->choices);
 	state->redraw_results = 1;
 }
@@ -257,14 +260,12 @@ static void action_end(tty_interface_t *state) {
 }
 
 static void action_pageup(tty_interface_t *state) {
-	update_state(state);
 	for (size_t i = 0; i < state->options->num_lines && state->choices->selection > 0; i++)
 		choices_prev(state->choices);
 	state->redraw_results = 1;
 }
 
 static void action_pagedown(tty_interface_t *state) {
-	update_state(state);
 	for (size_t i = 0; i < state->options->num_lines &&
 			   state->choices->selection < state->choices->available - 1;
 	     i++)
@@ -273,7 +274,6 @@ static void action_pagedown(tty_interface_t *state) {
 }
 
 static void action_autocomplete(tty_interface_t *state) {
-	update_state(state);
 	const char *current_selection = choices_get(state->choices, state->choices->selection);
 	if (current_selection) {
 		strncpy(state->search, choices_get(state->choices, state->choices->selection),
@@ -292,7 +292,7 @@ static void action_exit(tty_interface_t *state) {
 static void append_search(tty_interface_t *state, const short ch) {
 	char *search = state->search;
 	size_t search_size = strlen(search);
-	char ch_high = ch >> 8 & 0xFF;
+	char ch_high = ch >> 8;
 	char ch_low = ch & 0xFF;
 	size_t ch_size = ch_high ? 2 : 1;
 	if (search_size + ch_size <= SEARCH_SIZE_MAX) {
@@ -355,12 +355,12 @@ static const keybinding_t keybindings[] = {
     {'\0', NULL}			   /* End of keybindings */
 };
 
-static void handle_input(tty_interface_t *state, const short ch) {
+static void handle_input(tty_interface_t *state, const short wc) {
 	{
 		/* Figure out if we have completed a keybinding */
 		int found_keybinding = -1;
 		{
-			TTY_KEY ttykey = tty_to_tty_key(ch);
+			TTY_KEY ttykey = tty_to_tty_key(wc);
 			for (int i = 0; keybindings[i].action; i++) {
 				if (keybindings[i].key == ttykey) {
 					found_keybinding = i;
@@ -375,8 +375,10 @@ static void handle_input(tty_interface_t *state, const short ch) {
 		}
 	}
 	/* No matching keybinding, add to search */
-	if (is_print_cp932(ch)) {
-		append_search(state, ch);
+	if (is_print_cp932(wc)) {
+		tty_putw(state->tty, wc);
+		tty_flush(state->tty);
+		append_search(state, wc);
 	}
 }
 
@@ -387,14 +389,29 @@ int tty_interface_run(tty_interface_t *state) {
 
 	draw(state);
 
-	for (;;) {
-		handle_input(state, tty_getchar(state->tty));
-
-		if (state->exit >= 0)
-			return state->exit;
-
-		update_state(state);
+	while (1) {
+		clock_t start = clock();
+		int search_dirty = 0;
+		while (1) {
+			short wc = tty_getchar_nonblock(state->tty);
+			if (wc) {
+				handle_input(state, wc);
+				if (state->exit >= 0) {
+					return state->exit;
+				}
+				search_dirty = update_state(state);
+				if (!search_dirty) {
+					break;
+				}
+				start = clock();
+			} else {
+				if (search_dirty && (clock() - start >= 0.2 * CLOCKS_PER_SEC)) {
+					break;
+				}
+			}
+		}
 		draw(state);
+		tty_flush_keys();
 	}
 
 	return state->exit;

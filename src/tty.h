@@ -31,6 +31,16 @@ void tty_alloc(tty_t *, unsigned int);
 void tty_getwinsz(tty_t *tty);
 short tty_getchar(tty_t *tty);
 /*
+ * tty_getchar_nonblock
+ * Get a character from the tty without blocking.
+ */
+short tty_getchar_nonblock(tty_t *tty);
+/*
+ * tty_flush_keys
+ * Flush any pending input on the tty.
+ */
+void tty_flush_keys(void);
+/*
  * tty_getcursor
  * Get the current cursor position.
  */
@@ -93,6 +103,11 @@ void tty_moveup(tty_t *tty, int i);
 void tty_printf(tty_t *tty, const char *fmt, ...);
 void tty_fputs(tty_t *tty, const char *s);
 void tty_putc(tty_t *tty, const char c);
+/*
+ * tty_putw
+ * Write a wide character to the tty.
+ */
+void tty_putw(tty_t *tty, const short);
 void tty_flush(tty_t *tty);
 
 size_t tty_getwidth(tty_t *tty);

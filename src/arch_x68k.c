@@ -1,6 +1,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #include <x68k/dos.h>
 #include <x68k/iocs.h>
@@ -10,6 +11,13 @@
 
 #define X68K_COLOR_NORMAL 33
 #define X68K_COLOR_HIGHLIGHT 36
+
+clock_t clock(void) {
+	extern struct iocs_time __ontime;
+	struct iocs_time now = _iocs_ontime();
+	return ((now.day - __ontime.day) * 24 * 60 * 60 * 100 + (now.sec - __ontime.sec)) *
+	       CLOCKS_PER_SEC / 100;
+}
 
 int _dos_kflushonly() {
 	int ret;
@@ -121,18 +129,33 @@ void tty_getwinsz(tty_t *tty) {
 }
 
 short tty_getchar(tty_t *tty) {
-	static int initialized = 0;
-	if (!initialized) {
-		fclose(stdin); // これをしないと _dos_kflushonly() が効かない？
-		initialized = 1;
-	}
-	_dos_kflushonly();
 	short ret = _dos_k_keyinp();
 	if (is_cp932_lead_byte(ret)) {
 		ret = ret << 8 | _dos_k_keyinp();
 	}
 	sftsns = _dos_k_sftsns();
 	return ret;
+}
+
+short tty_getchar_nonblock(tty_t *tty) {
+	short ret = 0;
+	if (_dos_k_keysns()) {
+		ret = tty_getchar(tty);
+	}
+	return ret;
+}
+
+static void tty_close_stdin() {
+	static int initialized = 0;
+	if (!initialized) {
+		fclose(stdin); // これをしないと DOS _KFLUSH が効かない？
+		initialized = 1;
+	}
+}
+
+void tty_flush_keys(void) {
+	tty_close_stdin();
+	_dos_kflushonly();
 }
 
 tty_cursor_t tty_getcursor(tty_t *tty) {
@@ -261,6 +284,14 @@ void tty_putc(tty_t *tty, const char c) {
 	if (ttybufpos == sizeof(ttybuf) - 1) {
 		tty_flush(tty);
 	}
+}
+
+void tty_putw(tty_t *tty, const short wc) {
+	char ch_high = wc >> 8;
+	if (ch_high) {
+		tty_putc(tty, ch_high);
+	}
+	tty_putc(tty, wc & 0xff);
 }
 
 void tty_flush(tty_t *tty) {
