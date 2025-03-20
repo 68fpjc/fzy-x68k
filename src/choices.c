@@ -95,6 +95,8 @@ static void choices_reset_search(choices_t *c) {
 	free(c->results);
 	c->selection = c->available = 0;
 	c->results = NULL;
+	c->search_in_progress = 0;
+	c->processed_count = 0;
 }
 
 void choices_init(choices_t *c, options_t *options) {
@@ -108,6 +110,11 @@ void choices_init(choices_t *c, options_t *options) {
 	choices_resize(c, INITIAL_CHOICE_CAPACITY);
 
 	choices_reset_search(c);
+
+	// 遅延検索の初期化
+	c->last_search = NULL;
+	c->processed_count = 0;
+	c->search_in_progress = 0;
 }
 
 void choices_destroy(choices_t *c) {
@@ -122,6 +129,14 @@ void choices_destroy(choices_t *c) {
 	free(c->results);
 	c->results = NULL;
 	c->available = c->selection = 0;
+
+	// 遅延検索のクリーンアップ
+	if (c->last_search) {
+		free(c->last_search);
+		c->last_search = NULL;
+	}
+	c->processed_count = 0;
+	c->search_in_progress = 0;
 }
 
 void choices_add(choices_t *c, const char *choice) {
@@ -164,6 +179,65 @@ void choices_search(choices_t *c, const char *search) {
 	}
 
 	qsort(c->results, c->available, sizeof(struct scored_result), cmpchoice);
+}
+
+void choices_search_start(choices_t *c, const char *search) {
+	choices_reset_search(c);
+
+	// 最後の検索文字列を保存
+	if (c->last_search) {
+		free(c->last_search);
+	}
+	c->last_search = strdup(search);
+	if (!c->last_search) {
+		fprintf(stderr, "Error: Can't allocate memory for search string\n");
+		abort();
+	}
+
+	c->results = malloc(c->size * sizeof(struct scored_result));
+	if (!c->results) {
+		fprintf(stderr, "Error: Can't allocate memory\n");
+		abort();
+	}
+
+	c->processed_count = 0;
+	c->available = 0;
+	c->search_in_progress = 1;
+}
+
+int choices_search_step(choices_t *c, size_t batch_size) {
+	if (!c->search_in_progress || !c->last_search) {
+		return 0;
+	}
+
+	size_t end = c->processed_count + batch_size;
+	if (end > c->size) {
+		end = c->size;
+	}
+
+	// Process items in batches
+	for (size_t i = c->processed_count; i < end; i++) {
+		if (has_match(c->last_search, c->strings[i])) {
+			c->results[c->available].str = c->strings[i];
+			c->results[c->available].score = match(c->last_search, c->strings[i]);
+			c->available++;
+		}
+	}
+
+	c->processed_count = end;
+
+	// Once all items are processed, sort the results
+	if (c->processed_count >= c->size) {
+		qsort(c->results, c->available, sizeof(struct scored_result), cmpchoice);
+		c->search_in_progress = 0;
+		return 0; // Search complete
+	}
+
+	return 1; // Processing is still ongoing
+}
+
+int choices_is_search_complete(choices_t *c) {
+	return !c->search_in_progress;
 }
 
 const char *choices_get(choices_t *c, size_t n) {

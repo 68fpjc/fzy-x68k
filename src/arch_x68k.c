@@ -1,7 +1,6 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
 
 #include <x68k/dos.h>
 #include <x68k/iocs.h>
@@ -11,13 +10,6 @@
 
 #define X68K_COLOR_NORMAL 33
 #define X68K_COLOR_HIGHLIGHT 36
-
-clock_t clock(void) {
-	extern struct iocs_time __ontime;
-	struct iocs_time now = _iocs_ontime();
-	return ((now.day - __ontime.day) * 24 * 60 * 60 * 100 + (now.sec - __ontime.sec)) *
-	       CLOCKS_PER_SEC / 100;
-}
 
 int _dos_kflushonly() {
 	int ret;

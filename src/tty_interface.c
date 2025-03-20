@@ -3,11 +3,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 
 #include "../config.h"
 #include "match.h"
 #include "tty_interface.h"
+
+#define BATCH_SIZE 10
 
 int is_cp932_lead_byte(const char c) {
 	uint8_t tmp = c;
@@ -145,20 +146,22 @@ static void draw(tty_interface_t *state) {
 }
 
 static void update_search(tty_interface_t *state) {
-	choices_search(state->choices, state->search);
+	choices_search_start(state->choices, state->search); // 遅延検索を使う
 	strcpy(state->last_search, state->search);
-	state->redraw_results = 1;
+	// state->redraw_results = 1;
 	state->redraw_search = 1;
 }
 
-static int is_search_dirty(tty_interface_t *state) {
-	return strcmp(state->last_search, state->search);
-}
-
 static int update_state(tty_interface_t *state) {
-	int ret = is_search_dirty(state);
+	int ret = strcmp(state->last_search, state->search);
 	if (ret) {
 		update_search(state);
+	}
+	if (!choices_is_search_complete(state->choices)) {
+		if (!choices_search_step(state->choices, BATCH_SIZE)) {
+			state->redraw_results = 1; // 検索が完了した場合のみ結果を再描画
+			return 1;
+		}
 	}
 	return ret;
 }
@@ -313,7 +316,7 @@ void tty_interface_init(tty_interface_t *state, tty_t *tty, choices_t *choices,
 	state->options = options;
 
 	strcpy(state->search, "");
-	strcpy(state->last_search, "");
+	strcpy(state->last_search, "x"); // Force the search to start
 
 	state->exit = -1;
 
@@ -321,8 +324,6 @@ void tty_interface_init(tty_interface_t *state, tty_t *tty, choices_t *choices,
 		strncpy(state->search, options->init_search, SEARCH_SIZE_MAX);
 
 	state->cursor = strlen(state->search);
-
-	update_search(state);
 }
 
 typedef struct {
@@ -385,32 +386,18 @@ int tty_interface_run(tty_interface_t *state) {
 	draw_prompt(state);
 	state->search_home = tty_getcursor(state->tty);
 
-	draw(state);
-
 	while (1) {
-		clock_t start = clock();
-		int search_dirty = 0;
-		while (1) {
-			short wc = tty_getchar_nonblock(state->tty);
-			if (wc) {
-				handle_input(state, wc);
-				if (state->exit >= 0) {
-					return state->exit;
-				}
-				search_dirty = update_state(state);
-				if (!search_dirty) {
-					break;
-				}
-				start = clock();
-			} else {
-				if (search_dirty && (clock() - start >= 0.2 * CLOCKS_PER_SEC)) {
-					break;
-				}
+		short wc = tty_getchar_nonblock(state->tty);
+		if (wc) {
+			handle_input(state, wc);
+			if (state->exit >= 0) {
+				break;
 			}
 		}
+		if (!update_state(state) && wc) {
+			tty_flush_keys();
+		}
 		draw(state);
-		tty_flush_keys();
 	}
-
 	return state->exit;
 }
