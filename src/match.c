@@ -2,6 +2,7 @@
 #include <float.h>
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 
@@ -95,7 +96,15 @@ score_t match_positions(const char *needle, const char *haystack, size_t *positi
 	}
 
 	score_t match_bonus[m];
-	score_t D[n][m], M[n][m];
+	score_t(*D)[m] = malloc(sizeof(score_t) * n * m);
+	score_t(*M)[m] = malloc(sizeof(score_t) * n * m);
+	if (!D || !M) {
+		if (D)
+			free(D);
+		if (M)
+			free(M);
+		return SCORE_MIN;
+	}
 
 	/*
 	 * D[][] Stores the best score for this position ending with a match.
@@ -135,6 +144,8 @@ score_t match_positions(const char *needle, const char *haystack, size_t *positi
 	fprintf(stderr, "\n");
 #endif
 
+	score_t result = M[n - 1][m - 1];
+
 	/* backtrace to find the positions of optimal matching */
 	if (positions) {
 		int match_required = 0;
@@ -164,7 +175,10 @@ score_t match_positions(const char *needle, const char *haystack, size_t *positi
 		}
 	}
 
-	return M[n - 1][m - 1];
+	free(D);
+	free(M);
+
+	return result;
 }
 
 score_t match(const char *needle, const char *haystack) {

@@ -3,7 +3,7 @@
 
 #include <math.h>
 
-typedef double score_t;
+typedef float score_t;
 #define SCORE_MAX INFINITY
 #define SCORE_MIN -INFINITY
 
