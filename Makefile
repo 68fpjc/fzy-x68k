@@ -4,7 +4,8 @@ TARGET = fzy.x
 
 CC = m68k-xelf-gcc
 LD = $(CC)
-CFLAGS =-Wall -Wextra -g -std=c99 -O0 -pedantic -DVERSION=\"${VERSION}\" -D_GNU_SOURCE -MMD
+# CFLAGS =-Wall -Wextra -g -std=c99 -O0 -pedantic -DVERSION=\"${VERSION}\" -D_GNU_SOURCE -MMD
+CFLAGS =-Wall -Wextra -std=c99 -O3 -pedantic -DVERSION=\"${VERSION}\" -D_GNU_SOURCE -MMD
 LDLIBS =
 OBJS=src/fzy.o src/match.o src/choices.o src/options.o src/tty_interface.o src/cp932.o
 
