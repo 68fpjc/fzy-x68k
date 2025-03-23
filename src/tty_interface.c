@@ -233,10 +233,6 @@ static void action_prev(tty_interface_t *state) {
 	state->redraw_results = 1;
 }
 
-static void action_ignore(tty_interface_t *state) {
-	(void)state;
-}
-
 static void action_next(tty_interface_t *state) {
 	choices_next(state->choices);
 	state->redraw_results = 1;

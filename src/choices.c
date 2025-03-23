@@ -100,6 +100,7 @@ static void choices_reset_search(choices_t *c) {
 }
 
 void choices_init(choices_t *c, options_t *options) {
+	(void)options;
 	c->strings = NULL;
 	c->results = NULL;
 

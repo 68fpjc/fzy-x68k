@@ -101,15 +101,16 @@ void tty_close(tty_t *tty) {
 }
 
 void tty_init(tty_t *tty, const char *tty_filename) {
+	(void)tty_filename;
 	tty_getwinsz(tty);
 	tty_setnormal(tty);
 }
 
 void tty_alloc(tty_t *tty, unsigned int num_lines) {
-	for (int i = 0; i < num_lines; i++) {
+	for (unsigned int i = 0; i < num_lines; i++) {
 		tty_linefeed(tty);
 	}
-	for (int i = 0; i < num_lines; i++) {
+	for (unsigned int i = 0; i < num_lines; i++) {
 		tty_backline(tty);
 	}
 }
@@ -122,6 +123,7 @@ void tty_getwinsz(tty_t *tty) {
 }
 
 short tty_getchar(tty_t *tty) {
+	(void)tty;
 	short ret = _dos_k_keyinp();
 	if (is_cp932_lead_byte(ret)) {
 		ret = ret << 8 | _dos_k_keyinp();
@@ -161,34 +163,6 @@ void tty_setcursor(tty_t *tty, tty_cursor_t cursor) {
 	tty_printf(tty, "\x1b[%d;%dH", (cursor & 0xffff) + 1, (cursor >> 16) + 1);
 }
 
-int tty_input_ready(tty_t *tty, long int timeout, int return_on_signal) {
-	// fd_set readfs;
-	// FD_ZERO(&readfs);
-	// FD_SET(tty->fdin, &readfs);
-
-	// struct timespec ts = {timeout / 1000, (timeout % 1000) * 1000000};
-
-	// sigset_t mask;
-	// sigemptyset(&mask);
-	// if (!return_on_signal)
-	// 	sigaddset(&mask, SIGWINCH);
-
-	// int err = pselect(tty->fdin + 1, &readfs, NULL, NULL, timeout < 0 ? NULL : &ts,
-	// 		  return_on_signal ? NULL : &mask);
-
-	// if (err < 0) {
-	// 	if (errno == EINTR) {
-	// 		return 0;
-	// 	} else {
-	// 		perror("select");
-	// 		exit(EXIT_FAILURE);
-	// 	}
-	// } else {
-	// 	return FD_ISSET(tty->fdin, &readfs);
-	// }
-	return 1;
-}
-
 static void tty_sgr(tty_t *tty, int code) {
 	if (tty->sgr != code) {
 		tty_printf(tty, "\x1b[%im", code);
@@ -212,6 +186,7 @@ void tty_setinvert(tty_t *tty) {
 
 void tty_setunderline(tty_t *tty) {
 	// not supported
+	(void)tty;
 }
 
 void tty_setnormal(tty_t *tty) {
@@ -223,10 +198,12 @@ void tty_setnormal(tty_t *tty) {
 
 void tty_setnowrap(tty_t *tty) {
 	// not supported
+	(void)tty;
 }
 
 void tty_setwrap(tty_t *tty) {
 	// not supported
+	(void)tty;
 }
 
 void tty_carriagereturn(tty_t *tty) {
@@ -288,6 +265,7 @@ void tty_putw(tty_t *tty, const short wc) {
 }
 
 void tty_flush(tty_t *tty) {
+	(void)tty;
 	if (ttybufpos) {
 		ttybuf[ttybufpos] = 0;
 		_dos_c_print(ttybuf);
