@@ -1,4 +1,3 @@
-#include <ctype.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -202,12 +201,18 @@ static void action_del_word(tty_interface_t *state) {
 	size_t original_cursor = state->cursor;
 	size_t cursor = state->cursor;
 
-	while (cursor && isspace(state->search[cursor - 1]))
-		cursor--;
-
-	while (cursor && !isspace(state->search[cursor - 1]))
-		cursor--;
-
+	// カーソル位置がスペース上にある場合、そのスペースをスキップ
+	while (cursor > 0 &&
+	       (state->search[cursor - 1] == ' ' || state->search[cursor - 1] == '\t')) {
+		cursor = is_cp932_lead_byte(state->search[cursor - 2]) && cursor >= 2 ? cursor - 2
+										      : cursor - 1;
+	}
+	// 次に、スペースではない文字（単語の文字）をスキップ
+	while (cursor > 0 &&
+	       (state->search[cursor - 1] != ' ' && state->search[cursor - 1] != '\t')) {
+		cursor = is_cp932_lead_byte(state->search[cursor - 2]) && cursor >= 2 ? cursor - 2
+										      : cursor - 1;
+	}
 	memmove(&state->search[cursor], &state->search[original_cursor],
 		strlen(state->search) - original_cursor + 1);
 	state->cursor = cursor;
