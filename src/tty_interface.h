@@ -17,7 +17,8 @@ typedef struct {
 	size_t cursor;
 
 	int exit;
-	int redraw_search;	  // プロンプトとクエリの再描画が必要
+	int redraw_search_full;	  // クエリ全体の再描画が必要
+	int redraw_search_cursor; // カーソル位置の前までの再描画が必要
 	int redraw_results;	  // 検索結果リストの再描画が必要
 	tty_cursor_t search_home; // カーソルの位置
 } tty_interface_t;

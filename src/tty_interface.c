@@ -88,20 +88,16 @@ static void draw_prompt(tty_interface_t *state) {
 	tty_fputs(tty, options->prompt);
 }
 
-static void draw_search(tty_interface_t *state) {
+static void draw_search_full(tty_interface_t *state) {
 	tty_t *tty = state->tty;
-	options_t *options = state->options;
-
-	// TODO どうにかしたい
-
-	// カーソルを先頭に移動して
 	tty_setcursor(tty, state->search_home);
-	// クエリ全体を描画して
 	tty_fputs(tty, state->search);
 	tty_clearline(tty);
-	// またカーソルを先頭に移動して
+}
+
+static void draw_search_cursor(tty_interface_t *state) {
+	tty_t *tty = state->tty;
 	tty_setcursor(tty, state->search_home);
-	// クエリのカーソル位置の前まで描画する
 	for (size_t i = 0; i < state->cursor; i++)
 		tty_putc(tty, state->search[i]);
 }
@@ -133,9 +129,13 @@ static void draw_results(tty_interface_t *state) {
 }
 
 static void draw(tty_interface_t *state) {
-	if (state->redraw_search) {
-		draw_search(state);
-		state->redraw_search = 0;
+	if (state->redraw_search_full) {
+		draw_search_full(state);
+		state->redraw_search_full = 0;
+	}
+	if (state->redraw_search_cursor) {
+		draw_search_cursor(state);
+		state->redraw_search_cursor = 0;
 	}
 	if (state->redraw_results) {
 		tty_cursor_t cursor = tty_getcursor(state->tty);
@@ -149,8 +149,6 @@ static void draw(tty_interface_t *state) {
 static void update_search(tty_interface_t *state) {
 	choices_search_start(state->choices, state->search); // 遅延検索を使う
 	strcpy(state->last_search, state->search);
-	// state->redraw_results = 1;
-	state->redraw_search = 1;
 }
 
 static int update_state(tty_interface_t *state) {
@@ -195,6 +193,8 @@ static void action_del_char(tty_interface_t *state) {
 	state->cursor = prev_cursor(state);
 	memmove(&state->search[state->cursor], &state->search[original_cursor],
 		length - original_cursor + 1);
+	state->redraw_search_full = 1;
+	state->redraw_search_cursor = 1;
 }
 
 static void action_del_word(tty_interface_t *state) {
@@ -216,13 +216,16 @@ static void action_del_word(tty_interface_t *state) {
 	memmove(&state->search[cursor], &state->search[original_cursor],
 		strlen(state->search) - original_cursor + 1);
 	state->cursor = cursor;
+	state->redraw_search_full = 1;
+	state->redraw_search_cursor = 1;
 }
 
 static void action_del_all(tty_interface_t *state) {
 	memmove(state->search, &state->search[state->cursor],
 		strlen(state->search) - state->cursor + 1);
 	state->cursor = 0;
-	state->redraw_search = 1;
+	state->redraw_search_full = 1;
+	state->redraw_search_cursor = 1;
 }
 
 static void action_prev(tty_interface_t *state) {
@@ -243,21 +246,21 @@ static void action_left(tty_interface_t *state) {
 	size_t cursor = prev_cursor(state);
 	if (cursor != state->cursor) {
 		state->cursor = cursor;
-		state->redraw_search = 1;
+		state->redraw_search_cursor = 1;
 	}
 }
 
 static void action_right(tty_interface_t *state) {
 	if (state->cursor < strlen(state->search)) {
 		state->cursor += is_cp932_lead_byte(state->search[state->cursor]) ? 2 : 1;
-		state->redraw_search = 1;
+		state->redraw_search_cursor = 1;
 	}
 }
 
 static void action_beginning(tty_interface_t *state) {
 	if (state->cursor) {
 		state->cursor = 0;
-		state->redraw_search = 1;
+		state->redraw_search_cursor = 1;
 	}
 }
 
@@ -265,7 +268,7 @@ static void action_end(tty_interface_t *state) {
 	size_t cursor = strlen(state->search);
 	if (cursor != state->cursor) {
 		state->cursor = cursor;
-		state->redraw_search = 1;
+		state->redraw_search_cursor = 1;
 	}
 }
 
@@ -289,6 +292,8 @@ static void action_autocomplete(tty_interface_t *state) {
 		strncpy(state->search, choices_get(state->choices, state->choices->selection),
 			SEARCH_SIZE_MAX);
 		state->cursor = strlen(state->search);
+		state->redraw_search_full = 1;
+		state->redraw_search_cursor = 1;
 	}
 }
 
@@ -313,6 +318,8 @@ static void append_search(tty_interface_t *state, const short wc) {
 		}
 		*p = wc_low;
 		state->cursor += ch_size;
+		state->redraw_search_full = 1;
+		state->redraw_search_cursor = 1;
 	}
 }
 
@@ -326,6 +333,8 @@ void tty_interface_init(tty_interface_t *state, tty_t *tty, choices_t *choices,
 	strcpy(state->last_search, "x"); // Force the search to start
 
 	state->exit = -1;
+	state->redraw_search_full = 0;
+	state->redraw_search_cursor = 0;
 
 	if (options->init_search)
 		strncpy(state->search, options->init_search, SEARCH_SIZE_MAX);
