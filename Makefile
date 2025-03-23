@@ -1,4 +1,4 @@
-VERSION=1.0
+VERSION = "1.0 x68k-20250323-01"
 
 TARGET = fzy.x
 
