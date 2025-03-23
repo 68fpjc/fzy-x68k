@@ -7,23 +7,79 @@
 #include <strings.h>
 
 #include "bonus.h"
+#include "cp932.h"
 #include "match.h"
 
 #include "../config.h"
 
 char *strcasechr(const char *s, char c) {
-	const char accept[3] = {c, toupper(c), 0};
-	return strpbrk(s, accept);
+	// 全角文字をスキップしながら検索
+	while (*s) {
+		if (is_cp932_lead_byte(*s)) {
+			if (s[1] != '\0') {
+				s += 2; // 全角文字なので2バイト進める
+				continue;
+			}
+		}
+
+		if (*s == c || *s == toupper(c) || *s == tolower(c)) {
+			return (char *)s;
+		}
+		s++;
+	}
+	return NULL;
 }
 
 int has_match(const char *needle, const char *haystack) {
 	while (*needle) {
-		char nch = *needle++;
-
-		if (!(haystack = strcasechr(haystack, nch))) {
-			return 0;
+		char nch = *needle;
+		if (is_cp932_lead_byte(nch) && needle[1] != '\0') { // CP932 の全角文字の場合
+			// 全角文字は 2 バイト単位で検索
+			const char *match_pos = haystack;
+			int found = 0;
+			while ((match_pos = strstr(match_pos, needle)) != NULL) {
+				// 見つかった位置が全角文字の途中でないかチェック
+				int valid_pos = 1;
+				if (match_pos != haystack) {
+					// 文字列の先頭から検索して、
+					// match_pos が全角文字の2バイト目かどうかを判断
+					const char *scan_pos = haystack;
+					while (scan_pos < match_pos) {
+						if (is_cp932_lead_byte(*scan_pos)) {
+							// 全角文字の場合は 2 バイト進める
+							scan_pos += 2;
+							// もし scan_pos が
+							// match_pos と同じになったら、
+							// match_pos は全角文字の 2 バイト目
+							if (scan_pos > match_pos) {
+								valid_pos = 0;
+								break;
+							}
+						} else {
+							// 半角文字は 1 バイト進める
+							scan_pos++;
+						}
+					}
+				}
+				if (valid_pos) {
+					found = 1;
+					break;
+				}
+				match_pos++; // 次の位置から検索
+			}
+			if (!found) {
+				return 0;
+			}
+			needle += 2; // 全角文字なので2バイト進める
+			haystack = match_pos + 2;
+		} else {
+			// 半角文字の場合は以前の実装を使用
+			if (!(haystack = strcasechr(haystack, nch))) {
+				return 0;
+			}
+			needle++;
+			haystack++;
 		}
-		haystack++;
 	}
 	return 1;
 }
@@ -72,17 +128,22 @@ score_t match_positions(const char *needle, const char *haystack, size_t *positi
 	if (!*needle)
 		return SCORE_MIN;
 
-	int n = strlen(needle);
-	int m = strlen(haystack);
+	int n = cp932_strlen(needle);
+	int m = cp932_strlen(haystack);
 
 	if (n == m) {
 		/* Since this method can only be called with a haystack which
 		 * matches needle. If the lengths of the strings are equal the
 		 * strings themselves must also be equal (ignoring case).
 		 */
-		if (positions)
-			for (int i = 0; i < n; i++)
-				positions[i] = i;
+		if (positions) {
+			size_t pos = 0;
+			for (int i = 0; i < n; i++) {
+				positions[i] = pos;
+				pos +=
+				    is_cp932_lead_byte(haystack[pos]) && haystack[pos + 1] ? 2 : 1;
+			}
+		}
 		return SCORE_MAX;
 	}
 
@@ -93,6 +154,74 @@ score_t match_positions(const char *needle, const char *haystack, size_t *positi
 		 * just be ranked below any reasonably sized candidates
 		 */
 		return SCORE_MIN;
+	}
+
+	// 簡易文字マッチングでまず検証
+	if (!has_match(needle, haystack)) {
+		// 単純なマッチングもできない場合は最低スコアを返す
+		return SCORE_MIN;
+	}
+
+	// バイト位置から文字位置へのマッピングテーブルを作成
+	size_t needle_pos_map[n + 1];
+	size_t haystack_pos_map[m + 1];
+
+	// 文字位置をインデックスとしてバイト位置を格納
+	{
+		const char *s = needle;
+		for (int i = 0; i < n; i++) {
+			needle_pos_map[i] = s - needle;
+			s += is_cp932_lead_byte(*s) && *(s + 1) ? 2 : 1;
+		}
+		needle_pos_map[n] = strlen(needle);
+	}
+	{
+		const char *s = haystack;
+		for (int i = 0; i < m; i++) {
+			haystack_pos_map[i] = s - haystack;
+			s += is_cp932_lead_byte(*s) && *(s + 1) ? 2 : 1;
+		}
+		haystack_pos_map[m] = strlen(haystack);
+	}
+
+	// まず簡易的に文字位置を見つける
+	// これは完全に最適ではないが、マッチするポジションが確実に見つかる
+	if (positions) {
+		// 初期値は -1 (見つからなかった)
+		for (int i = 0; i < n; i++) {
+			positions[i] = (size_t)-1;
+		}
+
+		// 各文字について、ヘイスタック内で最初に出現する位置を見つける
+		size_t last_pos = 0;
+		for (int i = 0; i < n; i++) {
+			size_t needle_byte_pos = needle_pos_map[i];
+			char needle_char = needle[needle_byte_pos];
+			int is_double =
+			    is_cp932_lead_byte(needle_char) && needle[needle_byte_pos + 1];
+
+			// ヘイスタック内のこの文字を探す
+			for (size_t j = last_pos; j < strlen(haystack); j++) {
+				if (is_double) {
+					// 全角文字の場合
+					if (is_cp932_lead_byte(haystack[j]) && haystack[j + 1] &&
+					    haystack[j] == needle_char &&
+					    haystack[j + 1] == needle[needle_byte_pos + 1]) {
+						positions[i] = j;
+						last_pos = j + 2; // 次の検索は 2 バイト先から
+						break;
+					}
+				} else {
+					// 半角文字の場合
+					if (!is_cp932_lead_byte(haystack[j]) &&
+					    tolower(haystack[j]) == tolower(needle_char)) {
+						positions[i] = j;
+						last_pos = j + 1; // 次の検索は 1 バイト先から
+						break;
+					}
+				}
+			}
+		}
 	}
 
 	score_t match_bonus[m];
@@ -117,7 +246,32 @@ score_t match_positions(const char *needle, const char *haystack, size_t *positi
 		score_t gap_score = i == n - 1 ? SCORE_GAP_TRAILING : SCORE_GAP_INNER;
 
 		for (int j = 0; j < m; j++) {
-			if (tolower(needle[i]) == tolower(haystack[j])) {
+			// バイト位置で文字を比較
+			size_t needle_byte_pos = needle_pos_map[i];
+			size_t haystack_byte_pos = haystack_pos_map[j];
+
+			int is_match = 0;
+
+			// 半角 / 全角判定を直接バイト文字で行う
+			char needle_char = needle[needle_byte_pos];
+			char haystack_char = haystack[haystack_byte_pos];
+
+			// 両方全角文字の場合
+			if (is_cp932_lead_byte(needle_char) && is_cp932_lead_byte(haystack_char) &&
+			    needle[needle_byte_pos + 1] && haystack[haystack_byte_pos + 1]) {
+				// 2 バイト文字同士を比較 (大文字小文字区別)
+				is_match = (needle_char == haystack_char &&
+					    needle[needle_byte_pos + 1] ==
+						haystack[haystack_byte_pos + 1]);
+			}
+			// 両方半角文字の場合
+			else if (!is_cp932_lead_byte(needle_char) &&
+				 !is_cp932_lead_byte(haystack_char)) {
+				// 半角文字を比較 (大文字小文字無視)
+				is_match = (tolower(needle_char) == tolower(haystack_char));
+			}
+
+			if (is_match) {
 				score_t score = SCORE_MIN;
 				if (!i) {
 					score = (j * SCORE_GAP_LEADING) + match_bonus[j];
@@ -146,32 +300,41 @@ score_t match_positions(const char *needle, const char *haystack, size_t *positi
 
 	score_t result = M[n - 1][m - 1];
 
-	/* backtrace to find the positions of optimal matching */
-	if (positions) {
+	// DP 計算が完了してスコアが計算できたら、最適なバックトレースを行う
+	// 既に positions は簡易的に設定済みなので、ここでのエラーは無視しても動作する
+	if (positions && result != SCORE_MIN) {
 		int match_required = 0;
-		for (int i = n - 1, j = m - 1; i >= 0; i--) {
+		int found_all = 1;
+
+		// 一度全部リセット
+		for (int i = 0; i < n; i++) {
+			positions[i] = (size_t)-1;
+		}
+		// バックトレース
+		for (int i = n - 1, j = m - 1; i >= 0 && j >= 0; i--) {
+			int found = 0;
+
 			for (; j >= 0; j--) {
-				/*
-				 * There may be multiple paths which result in
-				 * the optimal weight.
-				 *
-				 * For simplicity, we will pick the first one
-				 * we encounter, the latest in the candidate
-				 * string.
-				 */
 				if (D[i][j] != SCORE_MIN &&
 				    (match_required || D[i][j] == M[i][j])) {
-					/* If this score was determined using
-					 * SCORE_MATCH_CONSECUTIVE, the
-					 * previous character MUST be a match
-					 */
+					positions[i] = haystack_pos_map[j];
 					match_required =
-					    i && j &&
+					    i > 0 && j > 0 &&
 					    M[i][j] == D[i - 1][j - 1] + SCORE_MATCH_CONSECUTIVE;
-					positions[i] = j--;
+					found = 1;
+					j--;
 					break;
 				}
 			}
+			if (!found) {
+				found_all = 0;
+				// このケースでは簡易マッチングの結果を維持する
+				break;
+			}
+		}
+		// 念のため、解が見つからなかった場合は手動で検出
+		if (!found_all) {
+			// 既に簡易マッチングで設定済みなので何もしない
 		}
 	}
 

@@ -5,21 +5,11 @@
 #include <string.h>
 
 #include "../config.h"
+#include "cp932.h"
 #include "match.h"
 #include "tty_interface.h"
 
 #define BATCH_SIZE 10
-
-int is_cp932_lead_byte(const char c) {
-	uint8_t tmp = c;
-	int ret = (tmp >= 0x81 && tmp <= 0x9F) || (tmp >= 0xE0 && tmp <= 0xFC);
-	return ret;
-}
-
-static int is_print_cp932(const short wc) {
-	char wc_high = wc >> 8;
-	return wc_high ? is_cp932_lead_byte(wc_high) : wc >= 0x20;
-}
 
 static size_t prev_cursor(tty_interface_t *state) {
 	size_t ret = 0;
@@ -45,10 +35,10 @@ static void draw_match(tty_interface_t *state, const char *choice, int selected)
 	options_t *options = state->options;
 	char *search = state->last_search;
 
-	int n = strlen(search);
+	size_t n = cp932_strlen(search);
 	size_t positions[n + 1];
-	for (int i = 0; i < n + 1; i++)
-		positions[i] = -1;
+	for (size_t i = 0; i < n + 1; i++)
+		positions[i] = (size_t)-1;
 
 	score_t score = match_positions(search, choice, &positions[0]);
 
@@ -68,14 +58,26 @@ static void draw_match(tty_interface_t *state, const char *choice, int selected)
 #endif
 
 	tty_setnowrap(tty);
-	for (size_t i = 0, p = 0; choice[i] != '\0'; i++) {
-		if (positions[p] == i) {
+	for (size_t i = 0; choice[i] != '\0';) {
+		int highlighted = 0;
+		for (size_t j = 0; j < n; j++) {
+			if (positions[j] == i) {
+				highlighted = 1;
+				break;
+			}
+		}
+		if (highlighted) {
 			tty_setfg(tty, TTY_COLOR_HIGHLIGHT);
-			p++;
 		} else {
 			tty_setfg(tty, TTY_COLOR_NORMAL);
 		}
 		tty_putc(tty, choice[i]);
+		if (is_cp932_lead_byte(choice[i]) && choice[i + 1]) {
+			tty_putc(tty, choice[i + 1]);
+			i += 2;
+		} else {
+			i++;
+		}
 	}
 	tty_setwrap(tty);
 	tty_setnormal(tty);

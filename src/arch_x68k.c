@@ -5,6 +5,7 @@
 #include <x68k/dos.h>
 #include <x68k/iocs.h>
 
+#include "cp932.h"
 #include "tty.h"
 #include "ttykey.h"
 
