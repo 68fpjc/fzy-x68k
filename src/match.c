@@ -241,6 +241,13 @@ score_t match_positions(const char *needle, const char *haystack, size_t *positi
 	 */
 	precompute_bonus(haystack, match_bonus);
 
+	// n または m が 0 の場合は処理できないのでエラーを返す
+	if (n <= 0 || m <= 0) {
+		free(D);
+		free(M);
+		return SCORE_MIN;
+	}
+
 	for (int i = 0; i < n; i++) {
 		score_t prev_score = SCORE_MIN;
 		score_t gap_score = i == n - 1 ? SCORE_GAP_TRAILING : SCORE_GAP_INNER;
