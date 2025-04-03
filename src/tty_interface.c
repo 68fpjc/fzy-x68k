@@ -36,10 +36,10 @@ static void draw_match(tty_interface_t *state, const char *choice, score_t score
 
 	size_t n = cp932_strlen(search);
 	size_t positions[n + 1];
+#ifdef HIGHLIGHT_OPTION
 	for (size_t i = 0; i < n + 1; i++)
 		positions[i] = (size_t)-1;
 
-#ifdef HIGHLIGHT_OPTION
 	// Calculate match positions only if highlighting is enabled
 	if (options->highlight) {
 		match_positions(search, choice, &positions[0]);
@@ -56,27 +56,28 @@ static void draw_match(tty_interface_t *state, const char *choice, score_t score
 		}
 	}
 
-	if (selected)
-#ifdef TTY_SELECTION_UNDERLINE
-		tty_setunderline(tty);
-#else
-		tty_setinvert(tty);
-#endif
-
 	tty_setnowrap(tty);
-#ifdef HIGHLIGHT_OPTION
-	// If highlighting is disabled, simply output the choice
-	if (!options->highlight) {
-		tty_setfg(tty, TTY_COLOR_NORMAL);
-		tty_fputs(tty, choice);
-	} else {
+	char code;
+	int clearline_done = 0;
+	for (size_t i = 0; (code = choice[i]) != '\0';) {
+		if (clearline_done == 0 && code == '\t') {
+			tty_clearline(tty);
+			clearline_done = 1;
+		}
+		if (i == 0 && selected)
+#ifdef TTY_SELECTION_UNDERLINE
+			tty_setunderline(tty);
+#else
+			tty_setinvert(tty);
 #endif
-		for (size_t i = 0; choice[i] != '\0';) {
+		if (options->highlight) {
 			int highlighted = 0;
-			for (size_t j = 0; j < n; j++) {
-				if (positions[j] == i) {
-					highlighted = 1;
-					break;
+			if (options->highlight) {
+				for (size_t j = 0; j < n; j++) {
+					if (positions[j] == i) {
+						highlighted = 1;
+						break;
+					}
 				}
 			}
 			if (highlighted) {
@@ -84,17 +85,15 @@ static void draw_match(tty_interface_t *state, const char *choice, score_t score
 			} else {
 				tty_setfg(tty, TTY_COLOR_NORMAL);
 			}
-			tty_putc(tty, choice[i]);
-			if (is_cp932_lead_byte(choice[i]) && choice[i + 1]) {
-				tty_putc(tty, choice[i + 1]);
-				i += 2;
-			} else {
-				i++;
-			}
 		}
-#ifdef HIGHLIGHT_OPTION
+		tty_putc(tty, code);
+		if (is_cp932_lead_byte(code) && choice[i + 1]) {
+			tty_putc(tty, choice[i + 1]);
+			i += 2;
+		} else {
+			i++;
+		}
 	}
-#endif
 	tty_setwrap(tty);
 	tty_setnormal(tty);
 }
@@ -135,15 +134,16 @@ static void draw_results(tty_interface_t *state) {
 		}
 	}
 	for (size_t i = start; i < start + num_lines; i++) {
-		tty_carriagereturn(tty);
-		tty_linefeed(tty);
-		tty_clearline(tty);
 		const char *choice = choices_get(choices, i);
 		if (choice) {
+			tty_carriagereturn(tty);
+			tty_linefeed(tty);
 			draw_match(state, choice, choices_getscore(choices, i),
 				   i == choices->selection);
+			tty_clearline(tty);
 		}
 	}
+	tty_clearend(tty);
 }
 
 static void draw(tty_interface_t *state) {
