@@ -1,6 +1,6 @@
 PROGRAM = fzy
-VERSION0 = 20250403-01
-VERSION = "1.0 x68k-$(VERSION0)"
+VERSION0 = x68k-20250403-01
+VERSION = "1.0 $(VERSION0)"
 
 TARGET = $(PROGRAM).x
 ARCHIVE = $(PROGRAM)-$(VERSION0).zip
@@ -26,7 +26,7 @@ ifeq ($(CC),m68k-xelf-gcc)
 endif
 DEPS = $(patsubst %.o,%.d,$(OBJS))
 
-.PHONY: all configh clean veryclean release
+.PHONY: all configh clean veryclean release bump-version
 
 all: gen_config_h $(TARGET)
 
@@ -55,3 +55,8 @@ release:
 	pandoc -f markdown -t plain README-x68k.md | iconv -t cp932 >$(DISTDIR)/README-x68k.txt
 	cd $(DISTDIR) && 7z a $(ARCHIVE) $(TARGET) README-x68k.txt
 	$(MAKE) clean
+
+bump-version:
+	@echo "Current version: $(VERSION0)"
+	@read -p "New version: " new_version && \
+	sed -i "s/VERSION0 = $(VERSION0)/VERSION0 = $$new_version/" makefile
