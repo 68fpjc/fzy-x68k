@@ -3,4 +3,5 @@
 *.o
 *.elf*
 *.d
+dist/
 config.h
