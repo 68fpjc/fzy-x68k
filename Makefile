@@ -10,7 +10,7 @@ LDLIBS =
 OBJS=src/fzy.o src/match.o src/choices.o src/options.o src/tty_interface.o src/cp932.o
 
 ifeq ($(CC),m68k-xelf-gcc)
-	CFLAGS += -DX68K
+	CFLAGS += -DHIGHLIGHT_OPTION
 	OBJS += src/arch_x68k.o
 endif
 

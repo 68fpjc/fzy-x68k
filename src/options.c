@@ -16,6 +16,10 @@ static const char *usage_str =
     " -t, --tty=TTY            Specify file to use as TTY device (default /dev/tty)\n"
     " -s, --show-scores        Show the scores of each match\n"
     " -j, --workers NUM        Use NUM workers for searching. (default is # of CPUs)\n"
+#ifdef HIGHLIGHT_OPTION
+    " -H, --highlight          Highlight matching characters\n"
+    " -n, --no-highlight       Do not highlight matching characters (default)\n"
+#endif
     " -h, --help     Display this help and exit\n"
     " -v, --version  Output version information and exit\n";
 
@@ -29,6 +33,10 @@ static struct option longopts[] = {{"show-matches", required_argument, NULL, 'e'
 				   {"tty", required_argument, NULL, 't'},
 				   {"prompt", required_argument, NULL, 'p'},
 				   {"show-scores", no_argument, NULL, 's'},
+#ifdef HIGHLIGHT_OPTION
+				   {"no-highlight", no_argument, NULL, 'n'},
+				   {"highlight", no_argument, NULL, 'H'},
+#endif
 				   {"version", no_argument, NULL, 'v'},
 				   {"benchmark", optional_argument, NULL, 'b'},
 				   {"workers", required_argument, NULL, 'j'},
@@ -46,13 +54,20 @@ void options_init(options_t *options) {
 	options->scrolloff = 1;
 	options->prompt = "> ";
 	options->workers = 0;
+#ifdef HIGHLIGHT_OPTION
+	options->highlight = 0; // By default, disable highlight display
+#endif
 }
 
 void options_parse(options_t *options, int argc, char *argv[]) {
 	options_init(options);
 
 	int c;
+#ifdef HIGHLIGHT_OPTION
+	while ((c = getopt_long(argc, argv, "vhsnHe:q:l:t:p:j:", longopts, NULL)) != -1) {
+#else
 	while ((c = getopt_long(argc, argv, "vhse:q:l:t:p:j:", longopts, NULL)) != -1) {
+#endif
 		switch (c) {
 			case 'v':
 				printf("%s " VERSION " (C) 2014-2018 John Hawthorn\n", argv[0]);
@@ -60,6 +75,14 @@ void options_parse(options_t *options, int argc, char *argv[]) {
 			case 's':
 				options->show_scores = 1;
 				break;
+#ifdef HIGHLIGHT_OPTION
+			case 'H':
+				options->highlight = 1; // Enable highlight display
+				break;
+			case 'n':
+				options->highlight = 0; // Disable highlight display
+				break;
+#endif
 			case 'q':
 				options->init_search = optarg;
 				break;

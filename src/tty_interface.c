@@ -29,7 +29,7 @@ static void clear(tty_interface_t *state) {
 	tty_flush(tty);
 }
 
-static void draw_match(tty_interface_t *state, const char *choice, int selected) {
+static void draw_match(tty_interface_t *state, const char *choice, score_t score, int selected) {
 	tty_t *tty = state->tty;
 	options_t *options = state->options;
 	char *search = state->last_search;
@@ -39,7 +39,14 @@ static void draw_match(tty_interface_t *state, const char *choice, int selected)
 	for (size_t i = 0; i < n + 1; i++)
 		positions[i] = (size_t)-1;
 
-	score_t score = match_positions(search, choice, &positions[0]);
+#ifdef HIGHLIGHT_OPTION
+	// Calculate match positions only if highlighting is enabled
+	if (options->highlight) {
+		match_positions(search, choice, &positions[0]);
+	}
+#else
+	match_positions(search, choice, &positions[0]);
+#endif
 
 	if (options->show_scores) {
 		if (score == SCORE_MIN) {
@@ -57,27 +64,37 @@ static void draw_match(tty_interface_t *state, const char *choice, int selected)
 #endif
 
 	tty_setnowrap(tty);
-	for (size_t i = 0; choice[i] != '\0';) {
-		int highlighted = 0;
-		for (size_t j = 0; j < n; j++) {
-			if (positions[j] == i) {
-				highlighted = 1;
-				break;
+#ifdef HIGHLIGHT_OPTION
+	// If highlighting is disabled, simply output the choice
+	if (!options->highlight) {
+		tty_setfg(tty, TTY_COLOR_NORMAL);
+		tty_fputs(tty, choice);
+	} else {
+#endif
+		for (size_t i = 0; choice[i] != '\0';) {
+			int highlighted = 0;
+			for (size_t j = 0; j < n; j++) {
+				if (positions[j] == i) {
+					highlighted = 1;
+					break;
+				}
+			}
+			if (highlighted) {
+				tty_setfg(tty, TTY_COLOR_HIGHLIGHT);
+			} else {
+				tty_setfg(tty, TTY_COLOR_NORMAL);
+			}
+			tty_putc(tty, choice[i]);
+			if (is_cp932_lead_byte(choice[i]) && choice[i + 1]) {
+				tty_putc(tty, choice[i + 1]);
+				i += 2;
+			} else {
+				i++;
 			}
 		}
-		if (highlighted) {
-			tty_setfg(tty, TTY_COLOR_HIGHLIGHT);
-		} else {
-			tty_setfg(tty, TTY_COLOR_NORMAL);
-		}
-		tty_putc(tty, choice[i]);
-		if (is_cp932_lead_byte(choice[i]) && choice[i + 1]) {
-			tty_putc(tty, choice[i + 1]);
-			i += 2;
-		} else {
-			i++;
-		}
+#ifdef HIGHLIGHT_OPTION
 	}
+#endif
 	tty_setwrap(tty);
 	tty_setnormal(tty);
 }
@@ -123,7 +140,8 @@ static void draw_results(tty_interface_t *state) {
 		tty_clearline(tty);
 		const char *choice = choices_get(choices, i);
 		if (choice) {
-			draw_match(state, choice, i == choices->selection);
+			draw_match(state, choice, choices_getscore(choices, i),
+				   i == choices->selection);
 		}
 	}
 }
