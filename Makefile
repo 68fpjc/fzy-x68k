@@ -1,5 +1,5 @@
 PROGRAM = fzy
-VERSION0 = x68k-0.1.1
+VERSION0 = x68k-0.1.2-dev
 VERSION = "1.0 $(VERSION0)"
 
 TARGET = $(PROGRAM).x
