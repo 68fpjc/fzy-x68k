@@ -1,3 +1,4 @@
+#include <condrv.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -95,15 +96,52 @@ void tty_reset(tty_t *tty) {
 	tty_fputs(tty, "\x1b[0m");
 }
 
+static int condrv_level = -1; // condrv_xoff() の戻り値
+
+/**
+ * @brief condrv(em).sys のバッファリング処理を復旧する
+ */
+static void xon_condrv(void) {
+	if (condrv_level >= 0) {
+		condrv_xon();
+		condrv_level = -1;
+	}
+}
+
+/**
+ * @brief エラーによるアボート時の処理
+ */
+__attribute__((noreturn)) static void errjvc(void) {
+	xon_condrv();
+	_dos_exit2(1);
+}
+
+/**
+ * @brief condrv(em).sys のバッファリング処理を停止する
+ *
+ * DOS _INTVCS により、エラーによるアボート時にはバッファリング処理を復旧する (ただし完全ではない)
+ */
+static void xoff_condrv(void) {
+	union {
+		void (*func_ptr)(void);
+		void *obj_ptr;
+	} safe_cast;
+	safe_cast.func_ptr = errjvc;
+	_dos_intvcs(0xfff2, safe_cast.obj_ptr);
+	condrv_level = condrv_xoff();
+}
+
 void tty_close(tty_t *tty) {
 	tty_reset(tty);
 	tty_flush(tty);
+	xon_condrv();
 }
 
 void tty_init(tty_t *tty, const char *tty_filename) {
 	(void)tty_filename;
 	tty_getwinsz(tty);
 	tty_setnormal(tty);
+	xoff_condrv();
 }
 
 void tty_alloc(tty_t *tty, unsigned int num_lines) {

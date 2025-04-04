@@ -6,6 +6,13 @@ TARGET = $(PROGRAM).x
 ARCHIVE = $(PROGRAM)-$(VERSION0).zip
 DISTDIR = dist
 
+LIBCONDRV_ARC = libcond100.zip
+LIBCONDRV_URL = https://github.com/kg68k/libcondrv/releases/download/v1.0.0/$(LIBCONDRV_ARC)
+LIBCONDRV_DIR = libcondrv
+LIBCONDRV_INCLUDE_DIR = $(LIBCONDRV_DIR)/include
+LIBCONDRV_INCLUDE = $(LIBCONDRV_INCLUDE_DIR)/condrv.h
+LIBCONDRV_LIB = $(LIBCONDRV_DIR)/libcondrv.a
+
 CROSS = m68k-xelf-
 CC = $(CROSS)gcc
 AS = $(CROSS)as
@@ -21,7 +28,8 @@ else
   CFLAGS = $(CFLAGS_COMMON) -O0 -g
 endif
 ifeq ($(CC),m68k-xelf-gcc)
-	CFLAGS += -m68000 -DHIGHLIGHT_OPTION
+	CFLAGS += -m68000 -DHIGHLIGHT_OPTION -I$(LIBCONDRV_INCLUDE_DIR)
+	LDLIBS +=  $(LIBCONDRV_LIB)
 	OBJS += src/arch_x68k.o
 endif
 DEPS = $(patsubst %.o,%.d,$(OBJS))
@@ -31,7 +39,7 @@ DEPS = $(patsubst %.o,%.d,$(OBJS))
 all: gen_config_h $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(LD) $^ $(LDLIBS) -o $@
+	$(LD) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
 -include $(DEPS)
 
@@ -40,8 +48,20 @@ gen_config_h: config.h
 config.h: src/config.def.h
 	cp $< $@
 
+src/arch_x68k.o: $(LIBCONDRV_LIB)
+
+# libcondrv を展開 / 変換する
+$(LIBCONDRV_LIB): $(LIBCONDRV_DIR)/$(LIBCONDRV_ARC)
+	7z x -y $< -o$(LIBCONDRV_DIR)
+	x68k2elf.py $(LIBCONDRV_DIR)/lib/libcondrv.a $@
+
+# libcondrv をダウンロードする
+$(LIBCONDRV_DIR)/$(LIBCONDRV_ARC):
+	wget -P $(LIBCONDRV_DIR) $(LIBCONDRV_URL)
+
 clean:
 	-rm -f *.x src/*.o *.elf* src/*.d
+	-rm -rf $(LIBCONDRV_DIR)/*
 	-rm -f config.h
 
 veryclean: clean
