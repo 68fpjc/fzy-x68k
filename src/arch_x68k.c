@@ -13,7 +13,7 @@
 #define X68K_COLOR_NORMAL 33
 #define X68K_COLOR_HIGHLIGHT 36
 
-int _dos_kflushonly() {
+static int _dos_kflushonly(void) {
 	int ret;
 	__asm__ volatile(
 	    // MODE = -1 の技は ED.X が使っている
@@ -25,69 +25,133 @@ int _dos_kflushonly() {
 	return ret;
 }
 
-// tty_getchar() が呼び出された時点のシフトキーの状態
+/**
+ * @brief tty_getchar() が呼び出された時点のキーコードグループ 7 の状態
+ */
+static int keybit7;
+
+/**
+ * @brief tty_getchar() が呼び出された時点のシフトキーの状態
+ */
 static int sftsns;
 
-static int tty_sns_ctrl() {
-	return sftsns & 0x0002;
+/**
+ * @brief シフトキーの状態を取得する (SHIFT / CTRL / OPT.1 / OPT.2)
+ * @return どれかが押されている場合は非ゼロ値、押されていない場合は 0
+ */
+static int tty_sftsns(void) {
+	return sftsns & 0x000f;
 }
 
+/**
+ * @brief カーソルキーの状態を取得する (↑)
+ * @return 押されている場合は非ゼロ値、押されていない場合は 0
+ */
+static int tty_sns_arrow_up(void) {
+	return keybit7 & 0x0010;
+}
+
+/**
+ * @brief カーソルキーの状態を取得する (↓)
+ * @return 押されている場合は非ゼロ値、押されていない場合は 0
+ */
+static int tty_sns_arrow_down(void) {
+	return keybit7 & 0x0040;
+}
+
+/**
+ * @brief カーソルキーの状態を取得する (←)
+ * @return 押されている場合は非ゼロ値、押されていない場合は 0
+ */
+static int tty_sns_arrow_left(void) {
+	return keybit7 & 0x0008;
+}
+
+/**
+ * @brief カーソルキーの状態を取得する (→)
+ * @return 押されている場合は非ゼロ値、押されていない場合は 0
+ */
+static int tty_sns_arrow_right(void) {
+	return keybit7 & 0x0020;
+}
+
+/**
+ * @brief ROLL UP キーの状態を取得する
+ * @return 押されている場合は非ゼロ値、押されていない場合は 0
+ */
+static int tty_sns_rollup(void) {
+	return keybit7 & 0x0001;
+}
+
+/**
+ * @brief ROLL DOWN キーの状態を取得する
+ * @return 押されている場合は非ゼロ値、押されていない場合は 0
+ */
+static int tty_sns_rolldown(void) {
+	return keybit7 & 0x0002;
+}
+
+/**
+ * @brief キーコードに対応する TTY_KEY の配列
+ */
+static const TTY_KEY tty_key_map[256] = {
+    [0x01] = TTY_KEY_CTRL_A, //
+    [0x02] = TTY_KEY_CTRL_B, //
+    [0x03] = TTY_KEY_CTRL_C, //
+    [0x04] = TTY_KEY_CTRL_D, //
+    [0x05] = TTY_KEY_CTRL_E, //
+    [0x06] = TTY_KEY_CTRL_F, //
+    [0x08] = TTY_KEY_CTRL_H, //
+    [0x09] = TTY_KEY_CTRL_I, //
+    [0x0a] = TTY_KEY_CTRL_J, //
+    [0x0b] = TTY_KEY_CTRL_K, //
+    [0x0d] = TTY_KEY_CTRL_M, //
+    [0x0e] = TTY_KEY_CTRL_N, //
+    [0x10] = TTY_KEY_CTRL_P, //
+    [0x15] = TTY_KEY_CTRL_U, //
+    [0x16] = TTY_KEY_CTRL_V, //
+    [0x17] = TTY_KEY_CTRL_W, //
+    [0x1a] = TTY_KEY_CTRL_Z, //
+    [0x1b] = TTY_KEY_ESC     //
+};
+#if TTY_KEY_NORMAL != 0
+#error TTY_KEY_NORMAL must be 0
+#endif
+
 TTY_KEY tty_to_tty_key(const short ch) {
-	TTY_KEY ret = TTY_KEY_NORMAL;
-	switch (ch) {
-		case 0x1b:
-			ret = TTY_KEY_ESC;
-			break;
-		case 0x08:
-			ret = TTY_KEY_CTRL_H;
-			break;
-		case 0x17:
-			ret = tty_sns_ctrl() ? TTY_KEY_CTRL_W : TTY_KEY_PAGEUP;
-			break;
-		case 0x15:
-			ret = TTY_KEY_CTRL_U;
-			break;
-		case 0x09:
-			ret = TTY_KEY_CTRL_I;
-			break;
-		case 0x03:
-			ret = TTY_KEY_CTRL_C;
-			break;
-		case 0x04:
-			ret = tty_sns_ctrl() ? TTY_KEY_CTRL_D : TTY_KEY_RIGHT;
-			break;
-		case 0x0d:
-			ret = TTY_KEY_CTRL_M;
-			break;
-		case 0x10:
-			ret = TTY_KEY_CTRL_P;
-			break;
-		case 0x0e:
-			ret = TTY_KEY_CTRL_N;
-			break;
-		case 0x0b:
-			ret = TTY_KEY_CTRL_K;
-			break;
-		case 0x0a:
-			ret = TTY_KEY_CTRL_J;
-			break;
-		case 0x01:
-			ret = TTY_KEY_CTRL_A;
-			break;
-		case 0x05:
-			ret = tty_sns_ctrl() ? TTY_KEY_CTRL_E : TTY_KEY_PAGEDOWN;
-			break;
-		case 0x13:
-			ret = TTY_KEY_LEFT;
-			break;
-		case 0x45:
-			ret = TTY_KEY_HOME;
-			break;
-		case 0x06:
-			ret = TTY_KEY_DOWN;
-			break;
-		default:
-			break;
+	TTY_KEY ret;
+	if (tty_sftsns()) {
+		// SHIFT / CTRL / OPT.1 / OPT.2 のいずれかが押されている場合は
+		// ASCII コードから変換する
+		ret = (ch >= 0 && ch < 256) ? tty_key_map[ch] : TTY_KEY_NORMAL;
+	} else {
+		// SHIFT / CTRL / OPT.1 / OPT.2 のいずれも押されていない場合
+		switch (ch) {
+			case 0x1b:
+				ret = TTY_KEY_ESC;
+				break;
+			default:
+				if (tty_sns_arrow_up()) {
+					ret = TTY_KEY_UP;
+				} else if (tty_sns_arrow_down()) {
+					ret = TTY_KEY_DOWN;
+				} else if (tty_sns_arrow_left()) {
+					ret = TTY_KEY_LEFT;
+				} else if (tty_sns_arrow_right()) {
+					ret = TTY_KEY_RIGHT;
+				} else if (tty_sns_arrow_up()) {
+					ret = TTY_KEY_UP;
+				} else if (tty_sns_arrow_down()) {
+					ret = TTY_KEY_DOWN;
+				} else if (tty_sns_rollup()) {
+					ret = TTY_KEY_PAGEUP;
+				} else if (tty_sns_rolldown()) {
+					ret = TTY_KEY_PAGEDOWN;
+				} else {
+					ret = TTY_KEY_NORMAL;
+				}
+				break;
+		}
 	}
 	return ret;
 }
@@ -166,6 +230,7 @@ short tty_getchar(tty_t *tty) {
 	if (is_cp932_lead_byte(ret)) {
 		ret = ret << 8 | _dos_k_keyinp();
 	}
+	keybit7 = _dos_k_keybit(7);
 	sftsns = _dos_k_sftsns();
 	return ret;
 }
@@ -178,7 +243,7 @@ short tty_getchar_nonblock(tty_t *tty) {
 	return ret;
 }
 
-static void tty_close_stdin() {
+static void tty_close_stdin(void) {
 	static int initialized = 0;
 	if (!initialized) {
 		fclose(stdin); // これをしないと DOS _KFLUSH が効かない？
