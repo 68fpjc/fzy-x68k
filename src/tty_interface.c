@@ -133,6 +133,7 @@ static void draw_results(tty_interface_t *state) {
 			start = available - num_lines;
 		}
 	}
+	int choices_count = 0;
 	for (size_t i = start; i < start + num_lines; i++) {
 		const char *choice = choices_get(choices, i);
 		if (choice) {
@@ -141,7 +142,12 @@ static void draw_results(tty_interface_t *state) {
 			draw_match(state, choice, choices_getscore(choices, i),
 				   i == choices->selection);
 			tty_clearline(tty);
+			choices_count++;
 		}
+	}
+	if (!choices_count) {
+		tty_carriagereturn(tty);
+		tty_linefeed(tty);
 	}
 	tty_clearend(tty);
 }
