@@ -36,63 +36,22 @@ static int keybit7;
 static int sftsns;
 
 /**
- * @brief シフトキーの状態を取得する (SHIFT / CTRL / OPT.1 / OPT.2)
- * @return どれかが押されている場合は非ゼロ値、押されていない場合は 0
+ * @brief キーコードに対応する TTY_KEY の配列 1
+ *
+ * SHIFT / CTRL / OPT.1 / OPT.2 のいずれも押されていない場合
  */
-static int tty_sftsns(void) {
-	return sftsns & 0x000f;
-}
+static const TTY_KEY tty_key_map_nonshift[256] = {
+    [0x07] = TTY_KEY_DEL,	//
+    [0x08] = TTY_KEY_BACKSPACE, //
+    [0x09] = TTY_KEY_TAB,	//
+    [0x0d] = TTY_KEY_ENTER,	//
+    [0x1b] = TTY_KEY_ESC	//
+};
 
 /**
- * @brief カーソルキーの状態を取得する (↑)
- * @return 押されている場合は非ゼロ値、押されていない場合は 0
- */
-static int tty_sns_arrow_up(void) {
-	return keybit7 & 0x0010;
-}
-
-/**
- * @brief カーソルキーの状態を取得する (↓)
- * @return 押されている場合は非ゼロ値、押されていない場合は 0
- */
-static int tty_sns_arrow_down(void) {
-	return keybit7 & 0x0040;
-}
-
-/**
- * @brief カーソルキーの状態を取得する (←)
- * @return 押されている場合は非ゼロ値、押されていない場合は 0
- */
-static int tty_sns_arrow_left(void) {
-	return keybit7 & 0x0008;
-}
-
-/**
- * @brief カーソルキーの状態を取得する (→)
- * @return 押されている場合は非ゼロ値、押されていない場合は 0
- */
-static int tty_sns_arrow_right(void) {
-	return keybit7 & 0x0020;
-}
-
-/**
- * @brief ROLL UP キーの状態を取得する
- * @return 押されている場合は非ゼロ値、押されていない場合は 0
- */
-static int tty_sns_rollup(void) {
-	return keybit7 & 0x0001;
-}
-
-/**
- * @brief ROLL DOWN キーの状態を取得する
- * @return 押されている場合は非ゼロ値、押されていない場合は 0
- */
-static int tty_sns_rolldown(void) {
-	return keybit7 & 0x0002;
-}
-
-/**
- * @brief キーコードに対応する TTY_KEY の配列
+ * @brief キーコードに対応する TTY_KEY の配列 2
+ *
+ * SHIFT / CTRL / OPT.1 / OPT.2 のいずれかが押されている場合
  */
 static const TTY_KEY tty_key_map[256] = {
     [0x01] = TTY_KEY_CTRL_A, //
@@ -114,46 +73,114 @@ static const TTY_KEY tty_key_map[256] = {
     [0x1a] = TTY_KEY_CTRL_Z, //
     [0x1b] = TTY_KEY_ESC     //
 };
+
 #if TTY_KEY_NORMAL != 0
 #error TTY_KEY_NORMAL must be 0
 #endif
 
-TTY_KEY tty_to_tty_key(const short ch) {
+/**
+ * @brief シフトキーの状態を取得する (SHIFT / CTRL / OPT.1 / OPT.2)
+ * @param sftsns シフトキーの状態
+ * @return いずれかが押されている場合は非ゼロ値、押されていない場合は 0
+ */
+static int tty_sftsns(const int sftsns) {
+	return sftsns & 0x000f;
+}
+
+/**
+ * @brief カーソルキーの状態を取得する (↑)
+ * @param keybit7 キーコードグループ 7 の状態
+ * @return 押されている場合は非ゼロ値、押されていない場合は 0
+ */
+static int tty_sns_arrow_up(const int keybit7) {
+	return keybit7 & 0x0010;
+}
+
+/**
+ * @brief カーソルキーの状態を取得する (↓)
+ * @param keybit7 キーコードグループ 7 の状態
+ * @return 押されている場合は非ゼロ値、押されていない場合は 0
+ */
+static int tty_sns_arrow_down(const int keybit7) {
+	return keybit7 & 0x0040;
+}
+
+/**
+ * @brief カーソルキーの状態を取得する (←)
+ * @param keybit7 キーコードグループ 7 の状態
+ * @return 押されている場合は非ゼロ値、押されていない場合は 0
+ */
+static int tty_sns_arrow_left(const int keybit7) {
+	return keybit7 & 0x0008;
+}
+
+/**
+ * @brief カーソルキーの状態を取得する (→)
+ * @param keybit7 キーコードグループ 7 の状態
+ * @return 押されている場合は非ゼロ値、押されていない場合は 0
+ */
+static int tty_sns_arrow_right(const int keybit7) {
+	return keybit7 & 0x0020;
+}
+
+/**
+ * @brief ROLL UP キーの状態を取得する
+ * @param keybit7 キーコードグループ 7 の状態
+ * @return 押されている場合は非ゼロ値、押されていない場合は 0
+ */
+static int tty_sns_rollup(const int keybit7) {
+	return keybit7 & 0x0001;
+}
+
+/**
+ * @brief ROLL DOWN キーの状態を取得する
+ * @param keybit7 キーコードグループ 7 の状態
+ * @return 押されている場合は非ゼロ値、押されていない場合は 0
+ */
+static int tty_sns_rolldown(const int keybit7) {
+	return keybit7 & 0x0002;
+}
+
+/**
+ * @brief X68000 のキー入力から TTY_KEY を取得する
+ * @param ch キーコード
+ * @param sftsns シフトキーの状態
+ * @param keybit7 キーコードグループ 7 の状態
+ * @return TTY_KEY
+ */
+static TTY_KEY tty_to_tty_key_internal(const short ch, const int sftsns, const int keybit7) {
 	TTY_KEY ret;
-	if (tty_sftsns()) {
-		// SHIFT / CTRL / OPT.1 / OPT.2 のいずれかが押されている場合は
-		// ASCII コードから変換する
+	if (tty_sftsns(sftsns)) {
 		ret = (ch >= 0 && ch < 256) ? tty_key_map[ch] : TTY_KEY_NORMAL;
 	} else {
-		// SHIFT / CTRL / OPT.1 / OPT.2 のいずれも押されていない場合
-		switch (ch) {
-			case 0x1b:
-				ret = TTY_KEY_ESC;
-				break;
-			default:
-				if (tty_sns_arrow_up()) {
-					ret = TTY_KEY_UP;
-				} else if (tty_sns_arrow_down()) {
-					ret = TTY_KEY_DOWN;
-				} else if (tty_sns_arrow_left()) {
-					ret = TTY_KEY_LEFT;
-				} else if (tty_sns_arrow_right()) {
-					ret = TTY_KEY_RIGHT;
-				} else if (tty_sns_arrow_up()) {
-					ret = TTY_KEY_UP;
-				} else if (tty_sns_arrow_down()) {
-					ret = TTY_KEY_DOWN;
-				} else if (tty_sns_rollup()) {
-					ret = TTY_KEY_PAGEUP;
-				} else if (tty_sns_rolldown()) {
-					ret = TTY_KEY_PAGEDOWN;
-				} else {
-					ret = TTY_KEY_NORMAL;
-				}
-				break;
+		ret = (ch >= 0 && ch < 256) ? tty_key_map_nonshift[ch] : TTY_KEY_NORMAL;
+		if (ret == TTY_KEY_NORMAL) {
+			if (tty_sns_arrow_up(keybit7)) {
+				ret = TTY_KEY_UP;
+			} else if (tty_sns_arrow_down(keybit7)) {
+				ret = TTY_KEY_DOWN;
+			} else if (tty_sns_arrow_left(keybit7)) {
+				ret = TTY_KEY_LEFT;
+			} else if (tty_sns_arrow_right(keybit7)) {
+				ret = TTY_KEY_RIGHT;
+			} else if (tty_sns_arrow_up(keybit7)) {
+				ret = TTY_KEY_UP;
+			} else if (tty_sns_arrow_down(keybit7)) {
+				ret = TTY_KEY_DOWN;
+			} else if (tty_sns_rollup(keybit7)) {
+				ret = TTY_KEY_PAGEUP;
+			} else if (tty_sns_rolldown(keybit7)) {
+				ret = TTY_KEY_PAGEDOWN;
+			} else {
+				ret = TTY_KEY_NORMAL;
+			}
 		}
 	}
 	return ret;
+}
+
+TTY_KEY tty_to_tty_key(const short ch) {
+	return tty_to_tty_key_internal(ch, sftsns, keybit7);
 }
 
 void tty_reset(tty_t *tty) {

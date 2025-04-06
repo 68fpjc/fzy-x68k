@@ -365,33 +365,36 @@ typedef struct {
 	void (*action)(tty_interface_t *);
 } keybinding_t;
 
-static void (*const keybindings[])(tty_interface_t *) = {
-    [TTY_KEY_CTRL_A] = action_beginning,    /* C-A */
-    [TTY_KEY_CTRL_B] = action_left,	    /* C-B */
-    [TTY_KEY_CTRL_C] = action_exit,	    /* C-C */
-    [TTY_KEY_CTRL_D] = action_exit,	    /* C-D */
-    [TTY_KEY_CTRL_E] = action_end,	    /* C-E */
-    [TTY_KEY_CTRL_F] = action_right,	    /* C-F */
-    [TTY_KEY_CTRL_H] = action_del_char,	    /* Backspace (C-H) */
-    [TTY_KEY_CTRL_I] = action_autocomplete, /* TAB (C-I ) */
-    [TTY_KEY_CTRL_J] = action_next,	    /* C-J */
-    [TTY_KEY_CTRL_K] = action_prev,	    /* C-K */
-    [TTY_KEY_CTRL_M] = action_emit,	    /* CR */
-    [TTY_KEY_CTRL_N] = action_next,	    /* C-N */
-    [TTY_KEY_CTRL_P] = action_prev,	    /* C-P */
-    [TTY_KEY_CTRL_U] = action_del_all,	    /* C-U */
-    [TTY_KEY_CTRL_V] = action_pagedown,	    /* C-V */
-    [TTY_KEY_CTRL_W] = action_del_word,	    /* C-W */
-    [TTY_KEY_CTRL_Z] = action_pageup,	    /* C-Z */
-    [TTY_KEY_ESC] = action_exit,	    /* ESC */
-    [TTY_KEY_LEFT] = action_left,	    /* Left */
-    [TTY_KEY_RIGHT] = action_right,	    /* Right */
-    [TTY_KEY_UP] = action_prev,		    /* Up */
-    [TTY_KEY_DOWN] = action_next,	    /* Down */
-    [TTY_KEY_HOME] = action_beginning,	    /* Home */
-    [TTY_KEY_PAGEUP] = action_pageup,	    /* PageUp */
-    [TTY_KEY_PAGEDOWN] = action_pagedown    /* PageDown */
-};
+static void (*const keybindings[])(tty_interface_t *) = { //
+    [TTY_KEY_CTRL_A] = action_beginning,
+    [TTY_KEY_CTRL_B] = action_left,
+    [TTY_KEY_CTRL_C] = action_exit,
+    [TTY_KEY_CTRL_D] = action_exit,
+    [TTY_KEY_CTRL_E] = action_end,
+    [TTY_KEY_CTRL_F] = action_right,
+    [TTY_KEY_CTRL_H] = action_del_char,
+    [TTY_KEY_CTRL_I] = action_autocomplete,
+    [TTY_KEY_CTRL_J] = action_next,
+    [TTY_KEY_CTRL_K] = action_prev,
+    [TTY_KEY_CTRL_M] = action_emit,
+    [TTY_KEY_CTRL_N] = action_next,
+    [TTY_KEY_CTRL_P] = action_prev,
+    [TTY_KEY_CTRL_U] = action_del_all,
+    [TTY_KEY_CTRL_V] = action_pagedown,
+    [TTY_KEY_CTRL_W] = action_del_word,
+    [TTY_KEY_CTRL_Z] = action_pageup,
+    [TTY_KEY_DEL] = action_del_char,
+    [TTY_KEY_BACKSPACE] = action_del_char,
+    [TTY_KEY_TAB] = action_autocomplete,
+    [TTY_KEY_ENTER] = action_emit,
+    [TTY_KEY_ESC] = action_exit,
+    [TTY_KEY_LEFT] = action_left,
+    [TTY_KEY_RIGHT] = action_right,
+    [TTY_KEY_UP] = action_prev,
+    [TTY_KEY_DOWN] = action_next,
+    [TTY_KEY_HOME] = action_beginning,
+    [TTY_KEY_PAGEUP] = action_pageup,
+    [TTY_KEY_PAGEDOWN] = action_pagedown};
 
 static void handle_input(tty_interface_t *state, const short wc) {
 	void (*action)(tty_interface_t *) = keybindings[tty_to_tty_key(wc)];
