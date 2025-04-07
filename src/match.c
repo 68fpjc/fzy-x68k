@@ -34,44 +34,48 @@ int has_match(const char *needle, const char *haystack) {
 	while (*needle) {
 		char nch = *needle;
 		if (is_cp932_lead_byte(nch) && needle[1] != '\0') { // CP932 の全角文字の場合
-			// 全角文字は 2 バイト単位で検索
+			// 全角文字 1 文字（2 バイト）を検索
 			const char *match_pos = haystack;
-			int found = 0;
-			while ((match_pos = strstr(match_pos, needle)) != NULL) {
-				// 見つかった位置が全角文字の途中でないかチェック
-				int valid_pos = 1;
-				if (match_pos != haystack) {
-					// 文字列の先頭から検索して、
-					// match_pos が全角文字の2バイト目かどうかを判断
-					const char *scan_pos = haystack;
-					while (scan_pos < match_pos) {
-						if (is_cp932_lead_byte(*scan_pos)) {
-							// 全角文字の場合は 2 バイト進める
-							scan_pos += 2;
-							// もし scan_pos が
-							// match_pos と同じになったら、
-							// match_pos は全角文字の 2 バイト目
-							if (scan_pos > match_pos) {
-								valid_pos = 0;
-								break;
+			while (1) {
+				// 全角文字が見つからない場合
+				if (!*match_pos) {
+					return 0;
+				}
+				// 全角文字の先頭バイトが一致しているか確認
+				if (is_cp932_lead_byte(*match_pos) && match_pos[1] != '\0' &&
+				    *match_pos == nch && match_pos[1] == needle[1]) {
+					// 見つかった位置が全角文字の途中でないかチェック
+					int valid_pos = 1;
+					if (match_pos != haystack) {
+						// 文字列の先頭から検索して、
+						// match_pos が全角文字の2バイト目かどうかを判断
+						const char *scan_pos = haystack;
+						while (scan_pos < match_pos) {
+							if (is_cp932_lead_byte(*scan_pos)) {
+								// 全角文字の場合は 2 バイト進める
+								scan_pos += 2;
+								// もし scan_pos が
+								// match_pos と同じになったら、
+								// match_pos は全角文字の 2 バイト目
+								if (scan_pos > match_pos) {
+									valid_pos = 0;
+									break;
+								}
+							} else {
+								// 半角文字は 1 バイト進める
+								scan_pos++;
 							}
-						} else {
-							// 半角文字は 1 バイト進める
-							scan_pos++;
 						}
 					}
-				}
-				if (valid_pos) {
-					found = 1;
-					break;
+					if (valid_pos) {
+						// 有効な位置で見つかったので次の文字へ
+						needle += 2; // 全角文字なので2バイト進める
+						haystack = match_pos + 2;
+						goto next_char; // 次の文字の処理へ
+					}
 				}
 				match_pos++; // 次の位置から検索
 			}
-			if (!found) {
-				return 0;
-			}
-			needle += 2; // 全角文字なので2バイト進める
-			haystack = match_pos + 2;
 		} else {
 			// 半角文字の場合は以前の実装を使用
 			if (!(haystack = strcasechr(haystack, nch))) {
@@ -80,6 +84,7 @@ int has_match(const char *needle, const char *haystack) {
 			needle++;
 			haystack++;
 		}
+	next_char:; // 次の文字の処理へのラベル
 	}
 	return 1;
 }
