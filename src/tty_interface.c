@@ -1,10 +1,11 @@
+#include <mbctype.h>
+#include <mbstring.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "../config.h"
-#include "cp932.h"
 #include "match.h"
 #include "tty_interface.h"
 
@@ -16,7 +17,7 @@ static size_t prev_cursor(tty_interface_t *state) {
 		size_t tmp = 0;
 		while (tmp < state->cursor) {
 			ret = tmp;
-			tmp += is_cp932_lead_byte(state->search[tmp]) ? 2 : 1;
+			tmp += ismbblead(state->search[tmp]) ? 2 : 1;
 		}
 	}
 	return ret;
@@ -34,7 +35,7 @@ static void draw_match(tty_interface_t *state, const char *choice, score_t score
 	options_t *options = state->options;
 	char *search = state->last_search;
 
-	size_t n = cp932_strlen(search);
+	size_t n = mbslen((const unsigned char *)search);
 	size_t positions[n + 1];
 #ifdef HIGHLIGHT_OPTION
 	for (size_t i = 0; i < n + 1; i++)
@@ -87,7 +88,7 @@ static void draw_match(tty_interface_t *state, const char *choice, score_t score
 			}
 		}
 		tty_putc(tty, code);
-		if (is_cp932_lead_byte(code) && choice[i + 1]) {
+		if (ismbblead(code) && choice[i + 1]) {
 			tty_putc(tty, choice[i + 1]);
 			i += 2;
 		} else {
@@ -227,13 +228,13 @@ static void action_del_word(tty_interface_t *state) {
 
 	while (cursor > 0 &&
 	       (state->search[cursor - 1] == ' ' || state->search[cursor - 1] == '\t')) {
-		cursor = is_cp932_lead_byte(state->search[cursor - 2]) && cursor >= 2 ? cursor - 2
-										      : cursor - 1;
+		cursor =
+		    ismbblead(state->search[cursor - 2]) && cursor >= 2 ? cursor - 2 : cursor - 1;
 	}
 	while (cursor > 0 &&
 	       (state->search[cursor - 1] != ' ' && state->search[cursor - 1] != '\t')) {
-		cursor = is_cp932_lead_byte(state->search[cursor - 2]) && cursor >= 2 ? cursor - 2
-										      : cursor - 1;
+		cursor =
+		    ismbblead(state->search[cursor - 2]) && cursor >= 2 ? cursor - 2 : cursor - 1;
 	}
 	memmove(&state->search[cursor], &state->search[original_cursor],
 		strlen(state->search) - original_cursor + 1);
@@ -270,7 +271,7 @@ static void action_left(tty_interface_t *state) {
 
 static void action_right(tty_interface_t *state) {
 	if (state->cursor < strlen(state->search)) {
-		state->cursor += is_cp932_lead_byte(state->search[state->cursor]) ? 2 : 1;
+		state->cursor += ismbblead(state->search[state->cursor]) ? 2 : 1;
 		state->redraw_search_cursor = 1;
 	}
 }
@@ -325,8 +326,8 @@ static void action_exit(tty_interface_t *state) {
 static void append_search(tty_interface_t *state, const short wc) {
 	char *search = state->search;
 	size_t search_size = strlen(search);
-	char wc_high = wc >> 8;
-	char wc_low = wc & 0xFF;
+	char wc_high = _MBGETH(wc);
+	char wc_low = _MBGETL(wc);
 	size_t ch_size = wc_high ? 2 : 1;
 	if (search_size + ch_size <= SEARCH_SIZE_MAX) {
 		char *p = search + state->cursor;
@@ -402,7 +403,7 @@ static void handle_input(tty_interface_t *state, const short wc) {
 		action(state);
 	} else {
 		/* No matching keybinding, add to search */
-		if (is_print_cp932(wc)) {
+		if (ismbcprint(wc)) {
 			tty_putw(state->tty, wc);
 			tty_flush(state->tty);
 			append_search(state, wc);

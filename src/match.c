@@ -1,13 +1,14 @@
 #include <ctype.h>
 #include <float.h>
 #include <math.h>
+#include <mbctype.h>
+#include <mbstring.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
 
 #include "bonus.h"
-#include "cp932.h"
 #include "match.h"
 
 #include "../config.h"
@@ -15,7 +16,7 @@
 char *strcasechr(const char *s, char c) {
 	// 全角文字をスキップしながら検索
 	while (*s) {
-		if (is_cp932_lead_byte(*s)) {
+		if (ismbblead(*s)) {
 			if (s[1] != '\0') {
 				s += 2; // 全角文字なので2バイト進める
 				continue;
@@ -33,7 +34,7 @@ char *strcasechr(const char *s, char c) {
 int has_match(const char *needle, const char *haystack) {
 	while (*needle) {
 		char nch = *needle;
-		if (is_cp932_lead_byte(nch) && needle[1] != '\0') { // CP932 の全角文字の場合
+		if (ismbblead(nch) && needle[1] != '\0') { // 全角文字の場合
 			// 全角文字 1 文字（2 バイト）を検索
 			const char *match_pos = haystack;
 			while (1) {
@@ -42,7 +43,7 @@ int has_match(const char *needle, const char *haystack) {
 					return 0;
 				}
 				// 全角文字の先頭バイトが一致しているか確認
-				if (is_cp932_lead_byte(*match_pos) && match_pos[1] != '\0' &&
+				if (ismbblead(*match_pos) && match_pos[1] != '\0' &&
 				    *match_pos == nch && match_pos[1] == needle[1]) {
 					// 見つかった位置が全角文字の途中でないかチェック
 					int valid_pos = 1;
@@ -51,7 +52,7 @@ int has_match(const char *needle, const char *haystack) {
 						// match_pos が全角文字の2バイト目かどうかを判断
 						const char *scan_pos = haystack;
 						while (scan_pos < match_pos) {
-							if (is_cp932_lead_byte(*scan_pos)) {
+							if (ismbblead(*scan_pos)) {
 								// 全角文字の場合は 2 バイト進める
 								scan_pos += 2;
 								// もし scan_pos が
@@ -133,8 +134,8 @@ score_t match_positions(const char *needle, const char *haystack, size_t *positi
 	if (!*needle)
 		return SCORE_MIN;
 
-	int n = cp932_strlen(needle);
-	int m = cp932_strlen(haystack);
+	int n = mbslen((const unsigned char *)needle);
+	int m = mbslen((const unsigned char *)haystack);
 
 	if (n == m) {
 		/* Since this method can only be called with a haystack which
@@ -145,8 +146,7 @@ score_t match_positions(const char *needle, const char *haystack, size_t *positi
 			size_t pos = 0;
 			for (int i = 0; i < n; i++) {
 				positions[i] = pos;
-				pos +=
-				    is_cp932_lead_byte(haystack[pos]) && haystack[pos + 1] ? 2 : 1;
+				pos += ismbblead(haystack[pos]) && haystack[pos + 1] ? 2 : 1;
 			}
 		}
 		return SCORE_MAX;
@@ -176,7 +176,7 @@ score_t match_positions(const char *needle, const char *haystack, size_t *positi
 		const char *s = needle;
 		for (int i = 0; i < n; i++) {
 			needle_pos_map[i] = s - needle;
-			s += is_cp932_lead_byte(*s) && *(s + 1) ? 2 : 1;
+			s += ismbblead(*s) && *(s + 1) ? 2 : 1;
 		}
 		needle_pos_map[n] = strlen(needle);
 	}
@@ -184,7 +184,7 @@ score_t match_positions(const char *needle, const char *haystack, size_t *positi
 		const char *s = haystack;
 		for (int i = 0; i < m; i++) {
 			haystack_pos_map[i] = s - haystack;
-			s += is_cp932_lead_byte(*s) && *(s + 1) ? 2 : 1;
+			s += ismbblead(*s) && *(s + 1) ? 2 : 1;
 		}
 		haystack_pos_map[m] = strlen(haystack);
 	}
@@ -202,14 +202,13 @@ score_t match_positions(const char *needle, const char *haystack, size_t *positi
 		for (int i = 0; i < n; i++) {
 			size_t needle_byte_pos = needle_pos_map[i];
 			char needle_char = needle[needle_byte_pos];
-			int is_double =
-			    is_cp932_lead_byte(needle_char) && needle[needle_byte_pos + 1];
+			int is_double = ismbblead(needle_char) && needle[needle_byte_pos + 1];
 
 			// ヘイスタック内のこの文字を探す
 			for (size_t j = last_pos; j < strlen(haystack); j++) {
 				if (is_double) {
 					// 全角文字の場合
-					if (is_cp932_lead_byte(haystack[j]) && haystack[j + 1] &&
+					if (ismbblead(haystack[j]) && haystack[j + 1] &&
 					    haystack[j] == needle_char &&
 					    haystack[j + 1] == needle[needle_byte_pos + 1]) {
 						positions[i] = j;
@@ -218,7 +217,7 @@ score_t match_positions(const char *needle, const char *haystack, size_t *positi
 					}
 				} else {
 					// 半角文字の場合
-					if (!is_cp932_lead_byte(haystack[j]) &&
+					if (!ismbblead(haystack[j]) &&
 					    tolower(haystack[j]) == tolower(needle_char)) {
 						positions[i] = j;
 						last_pos = j + 1; // 次の検索は 1 バイト先から
@@ -269,7 +268,7 @@ score_t match_positions(const char *needle, const char *haystack, size_t *positi
 			char haystack_char = haystack[haystack_byte_pos];
 
 			// 両方全角文字の場合
-			if (is_cp932_lead_byte(needle_char) && is_cp932_lead_byte(haystack_char) &&
+			if (ismbblead(needle_char) && ismbblead(haystack_char) &&
 			    needle[needle_byte_pos + 1] && haystack[haystack_byte_pos + 1]) {
 				// 2 バイト文字同士を比較 (大文字小文字区別)
 				is_match = (needle_char == haystack_char &&
@@ -277,8 +276,7 @@ score_t match_positions(const char *needle, const char *haystack, size_t *positi
 						haystack[haystack_byte_pos + 1]);
 			}
 			// 両方半角文字の場合
-			else if (!is_cp932_lead_byte(needle_char) &&
-				 !is_cp932_lead_byte(haystack_char)) {
+			else if (!ismbblead(needle_char) && !ismbblead(haystack_char)) {
 				// 半角文字を比較 (大文字小文字無視)
 				is_match = (tolower(needle_char) == tolower(haystack_char));
 			}

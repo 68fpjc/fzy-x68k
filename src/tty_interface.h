@@ -25,6 +25,5 @@ typedef struct {
 
 void tty_interface_init(tty_interface_t *state, tty_t *tty, choices_t *choices, options_t *options);
 int tty_interface_run(tty_interface_t *state);
-int is_cp932_lead_byte(const char);
 
 #endif

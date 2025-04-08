@@ -1,4 +1,5 @@
 #include <condrv.h>
+#include <mbctype.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -6,7 +7,6 @@
 #include <x68k/dos.h>
 #include <x68k/iocs.h>
 
-#include "cp932.h"
 #include "tty.h"
 #include "ttykey.h"
 
@@ -254,7 +254,7 @@ void tty_getwinsz(tty_t *tty) {
 short tty_getchar(tty_t *tty) {
 	(void)tty;
 	short ret = _dos_k_keyinp();
-	if (is_cp932_lead_byte(ret)) {
+	if (ismbblead(ret)) {
 		ret = ret << 8 | _dos_k_keyinp();
 	}
 	keybit7 = _dos_k_keybit(7);
