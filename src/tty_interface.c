@@ -415,6 +415,7 @@ int tty_interface_run(tty_interface_t *state) {
 	tty_alloc(state->tty, state->options->num_lines);
 	draw_prompt(state);
 	state->search_home = tty_getcursor(state->tty);
+	draw_search_full(state);
 
 	while (1) {
 		short wc = tty_getchar_nonblock(state->tty);
