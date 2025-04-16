@@ -13,22 +13,23 @@
 
 #include "../config.h"
 
-char *strcasechr(const char *s, char c) {
-	// 全角文字をスキップしながら検索
-	while (*s) {
-		if (ismbblead(*s)) {
-			if (s[1] != '\0') {
-				s += 2; // 全角文字なので2バイト進める
-				continue;
+char *strcasechr(const char *s, int c) {
+	unsigned char *tmp = (unsigned char *)s;
+	if (!_MBIS16(c)) {
+		int upper = toupper(c);
+		int mbc = mbbtombc(c);
+		int mbc_upper = mbbtombc(upper);
+		int nch;
+		while ((nch = mbsnextc(tmp)) != 0) {
+			if (nch == c || nch == upper || nch == mbc || nch == mbc_upper) {
+				return (char *)tmp;
 			}
+			tmp = mbsinc(tmp);
 		}
-
-		if (*s == c || *s == toupper(c) || *s == tolower(c)) {
-			return (char *)s;
-		}
-		s++;
+		return NULL;
+	} else {
+		return (char *)mbschr(tmp, c);
 	}
-	return NULL;
 }
 
 int has_match(const char *needle, const char *haystack) {
