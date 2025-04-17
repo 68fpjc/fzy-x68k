@@ -99,13 +99,9 @@ score_t match_positions(const char *needle, const char *haystack, size_t *positi
 		 * matches needle. If the lengths of the strings are equal the
 		 * strings themselves must also be equal (ignoring case).
 		 */
-		if (positions) {
-			size_t pos = 0;
-			for (int i = 0; i < n; i++) {
-				positions[i] = pos;
-				pos += ismbblead(haystack[pos]) && haystack[pos + 1] ? 2 : 1;
-			}
-		}
+		if (positions)
+			for (size_t i = 0; i < n; i++)
+				positions[i] = i;
 		return SCORE_MAX;
 	}
 
