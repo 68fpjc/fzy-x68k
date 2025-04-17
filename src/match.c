@@ -13,82 +13,38 @@
 
 #include "../config.h"
 
-char *strcasechr(const char *s, int c) {
-	unsigned char *tmp = (unsigned char *)s;
+unsigned char *strcasechr(const unsigned char *s, int c) {
 	if (!_MBIS16(c)) {
 		int upper = toupper(c);
 		int mbc = mbbtombc(c);
 		int mbc_upper = mbbtombc(upper);
 		int nch;
-		while ((nch = mbsnextc(tmp)) != 0) {
+		while ((nch = mbsnextc(s)) != 0) {
 			if (nch == c || nch == upper || nch == mbc || nch == mbc_upper) {
-				return (char *)tmp;
+				return (unsigned char *)s;
 			}
-			tmp = mbsinc(tmp);
+			s = mbsinc((unsigned char *)s);
 		}
 		return NULL;
 	} else {
-		return (char *)mbschr(tmp, c);
+		return mbschr(s, c);
 	}
 }
 
-int has_match(const char *needle, const char *haystack) {
-	while (*needle) {
-		char nch = *needle;
-		if (ismbblead(nch) && needle[1] != '\0') { // 全角文字の場合
-			// 全角文字 1 文字（2 バイト）を検索
-			const char *match_pos = haystack;
-			while (1) {
-				// 全角文字が見つからない場合
-				if (!*match_pos) {
-					return 0;
-				}
-				// 全角文字の先頭バイトが一致しているか確認
-				if (ismbblead(*match_pos) && match_pos[1] != '\0' &&
-				    *match_pos == nch && match_pos[1] == needle[1]) {
-					// 見つかった位置が全角文字の途中でないかチェック
-					int valid_pos = 1;
-					if (match_pos != haystack) {
-						// 文字列の先頭から検索して、
-						// match_pos が全角文字の2バイト目かどうかを判断
-						const char *scan_pos = haystack;
-						while (scan_pos < match_pos) {
-							if (ismbblead(*scan_pos)) {
-								// 全角文字の場合は 2 バイト進める
-								scan_pos += 2;
-								// もし scan_pos が
-								// match_pos と同じになったら、
-								// match_pos は全角文字の 2 バイト目
-								if (scan_pos > match_pos) {
-									valid_pos = 0;
-									break;
-								}
-							} else {
-								// 半角文字は 1 バイト進める
-								scan_pos++;
-							}
-						}
-					}
-					if (valid_pos) {
-						// 有効な位置で見つかったので次の文字へ
-						needle += 2; // 全角文字なので2バイト進める
-						haystack = match_pos + 2;
-						goto next_char; // 次の文字の処理へ
-					}
-				}
-				match_pos++; // 次の位置から検索
-			}
-		} else {
-			// 半角文字の場合は以前の実装を使用
-			if (!(haystack = strcasechr(haystack, nch))) {
-				return 0;
-			}
-			needle++;
-			haystack++;
+static int has_match_internal(const unsigned char *needle, const unsigned char *haystack) {
+	int nch;
+	while ((nch = mbsnextc(needle))) {
+		needle = mbsinc((unsigned char *)needle);
+		if (!(haystack = strcasechr(haystack, nch))) {
+			return 0;
 		}
-	next_char:; // 次の文字の処理へのラベル
+		haystack = mbsinc((unsigned char *)haystack);
 	}
 	return 1;
+}
+
+int has_match(const char *needle, const char *haystack) {
+	return has_match_internal((const unsigned char *)needle, (const unsigned char *)haystack);
 }
 
 #define max(a, b) (((a) > (b)) ? (a) : (b))
