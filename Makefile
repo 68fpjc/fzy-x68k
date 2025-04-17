@@ -28,7 +28,7 @@ AS = $(CROSS)as
 LD = $(CROSS)gcc
 
 CFLAGS_COMMON = -Wall -Wextra -std=c99 -pedantic -DVERSION=\"${VERSION}\" -D_GNU_SOURCE -MMD \
-  -m68000 -DHIGHLIGHT_OPTION -I$(LIBCONDRV_INCLUDE_DIR) -I$(LIBMB_INCLUDE_DIR)
+  -m68000 -DHIGHLIGHT_OPTION -DNO_CALC_SCORE_OPTION -I$(LIBCONDRV_INCLUDE_DIR) -I$(LIBMB_INCLUDE_DIR)
 OBJS=src/fzy.o src/match.o src/choices.o src/options.o src/tty_interface.o \
   src/arch_x68k.o
 LDFLAGS =

@@ -112,7 +112,14 @@ void choices_init(choices_t *c, options_t *options) {
 
 	choices_reset_search(c);
 
-	// 遅延検索の初期化
+	c->match = match;
+#ifdef NO_CALC_SCORE_OPTION
+	if (!options->calc_score) {
+		c->match = match_stub;
+	}
+#endif
+
+	/* Initialize delayed search */
 	c->last_search = NULL;
 	c->processed_count = 0;
 	c->search_in_progress = 0;
@@ -131,7 +138,7 @@ void choices_destroy(choices_t *c) {
 	c->results = NULL;
 	c->available = c->selection = 0;
 
-	// 遅延検索のクリーンアップ
+	// Cleanup for delayed search
 	if (c->last_search) {
 		free(c->last_search);
 		c->last_search = NULL;
@@ -174,7 +181,7 @@ void choices_search(choices_t *c, const char *search) {
 	for (size_t i = 0; i < c->size; i++) {
 		if (has_match(search, c->strings[i])) {
 			c->results[c->available].str = c->strings[i];
-			c->results[c->available].score = match(search, c->strings[i]);
+			c->results[c->available].score = c->match(search, c->strings[i]);
 			c->available++;
 		}
 	}
@@ -185,7 +192,7 @@ void choices_search(choices_t *c, const char *search) {
 void choices_search_start(choices_t *c, const char *search) {
 	choices_reset_search(c);
 
-	// 最後の検索文字列を保存
+	// Save the last search string
 	if (c->last_search) {
 		free(c->last_search);
 	}
@@ -220,7 +227,7 @@ int choices_search_step(choices_t *c, size_t batch_size) {
 	for (size_t i = c->processed_count; i < end; i++) {
 		if (has_match(c->last_search, c->strings[i])) {
 			c->results[c->available].str = c->strings[i];
-			c->results[c->available].score = match(c->last_search, c->strings[i]);
+			c->results[c->available].score = c->match(c->last_search, c->strings[i]);
 			c->available++;
 		}
 	}

@@ -17,6 +17,7 @@ Usage: fzy [OPTION]...
  -j, --workers NUM        Use NUM workers for searching. (default is # of CPUs)
  -H, --highlight          Highlight matching characters
  -n, --no-highlight       Do not highlight matching characters (default)
+ -c, --no-calc-score      Disable score calculation
  -h, --help     Display this help and exit
  -v, --version  Output version information and exit
 ```
@@ -24,6 +25,8 @@ Usage: fzy [OPTION]...
 - コマンドラインオプション `-n` と `-H` を追加しました :
   - オリジナルの fzy は一致した文字をハイライト表示しますが、 `-n` で抑制します
   - ハイライト表示は非常に重いため、 X68000 版のデフォルトは `-n` です
+- コマンドラインオプション `-c` を追加しました :
+  - 簡易検索を行います。動作が軽くなりますが、スコア計算を行わないため、検索結果のソートがデタラメになります
 - 下記コマンドラインオプションは機能しません。指定しても無視されます :
   - `-t`
   - `-j`

@@ -11,9 +11,8 @@ typedef struct {
 	unsigned int scrolloff;
 	const char *prompt;
 	unsigned int workers;
-#ifdef HIGHLIGHT_OPTION
 	int highlight;
-#endif
+	int calc_score;
 } options_t;
 
 void options_init(options_t *options);

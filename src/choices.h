@@ -26,6 +26,9 @@ typedef struct {
 
 	unsigned int worker_count;
 
+	// Function to match a string
+	score_t (*match)(const char *needle, const char *haystack);
+
 	// State for delayed search
 	char *last_search;
 	size_t processed_count;

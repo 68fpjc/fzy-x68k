@@ -20,6 +20,9 @@ static const char *usage_str =
     " -H, --highlight          Highlight matching characters\n"
     " -n, --no-highlight       Do not highlight matching characters (default)\n"
 #endif
+#ifdef NO_CALC_SCORE_OPTION
+    " -c, --no-calc-score      Disable score calculation\n"
+#endif
     " -h, --help     Display this help and exit\n"
     " -v, --version  Output version information and exit\n";
 
@@ -36,6 +39,9 @@ static struct option longopts[] = {{"show-matches", required_argument, NULL, 'e'
 #ifdef HIGHLIGHT_OPTION
 				   {"no-highlight", no_argument, NULL, 'n'},
 				   {"highlight", no_argument, NULL, 'H'},
+#endif
+#ifdef NO_CALC_SCORE_OPTION
+				   {"no-calc-score", no_argument, NULL, 'c'},
 #endif
 				   {"version", no_argument, NULL, 'v'},
 				   {"benchmark", optional_argument, NULL, 'b'},
@@ -54,20 +60,31 @@ void options_init(options_t *options) {
 	options->scrolloff = 1;
 	options->prompt = "> ";
 	options->workers = 0;
-#ifdef HIGHLIGHT_OPTION
+#ifndef HIGHLIGHT_OPTION
+	options->highlight = 1; // By default, enable highlight display
+#else
 	options->highlight = 0; // By default, disable highlight display
 #endif
+	options->calc_score = 1; // By default, enable score calculation
 }
 
 void options_parse(options_t *options, int argc, char *argv[]) {
 	options_init(options);
 
 	int c;
+	char optstring[32] = "vhse:q:l:t:p:j:";
+	int pos = strlen(optstring);
+
 #ifdef HIGHLIGHT_OPTION
-	while ((c = getopt_long(argc, argv, "vhsnHe:q:l:t:p:j:", longopts, NULL)) != -1) {
-#else
-	while ((c = getopt_long(argc, argv, "vhse:q:l:t:p:j:", longopts, NULL)) != -1) {
+	optstring[pos++] = 'n';
+	optstring[pos++] = 'H';
 #endif
+#ifdef NO_CALC_SCORE_OPTION
+	optstring[pos++] = 'c';
+#endif
+	optstring[pos] = '\0';
+
+	while ((c = getopt_long(argc, argv, optstring, longopts, NULL)) != -1) {
 		switch (c) {
 			case 'v':
 				printf("%s " VERSION " (C) 2014-2018 John Hawthorn\n", argv[0]);
@@ -75,14 +92,6 @@ void options_parse(options_t *options, int argc, char *argv[]) {
 			case 's':
 				options->show_scores = 1;
 				break;
-#ifdef HIGHLIGHT_OPTION
-			case 'H':
-				options->highlight = 1; // Enable highlight display
-				break;
-			case 'n':
-				options->highlight = 0; // Disable highlight display
-				break;
-#endif
 			case 'q':
 				options->init_search = optarg;
 				break;
@@ -123,6 +132,15 @@ void options_parse(options_t *options, int argc, char *argv[]) {
 				}
 				options->num_lines = l;
 			} break;
+			case 'H':
+				options->highlight = 1; // Enable highlight display
+				break;
+			case 'n':
+				options->highlight = 0; // Disable highlight display
+				break;
+			case 'c':
+				options->calc_score = 0;
+				break;
 			case 'h':
 			default:
 				usage(argv[0]);

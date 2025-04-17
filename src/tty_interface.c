@@ -37,17 +37,14 @@ static void draw_match(tty_interface_t *state, const char *choice, score_t score
 
 	size_t n = mbslen((const unsigned char *)search);
 	size_t positions[n + 1];
-#ifdef HIGHLIGHT_OPTION
+
 	for (size_t i = 0; i < n + 1; i++)
 		positions[i] = (size_t)-1;
 
-	// Calculate match positions only if highlighting is enabled
-	if (options->highlight) {
+	// Calculate match positions if needed
+	if (options->calc_score && options->highlight) {
 		match_positions(search, choice, &positions[0]);
 	}
-#else
-	match_positions(search, choice, &positions[0]);
-#endif
 
 	if (options->show_scores) {
 		if (score == SCORE_MIN) {
@@ -74,12 +71,10 @@ static void draw_match(tty_interface_t *state, const char *choice, score_t score
 #endif
 		if (options->highlight) {
 			int highlighted = 0;
-			if (options->highlight) {
-				for (size_t j = 0; j < n; j++) {
-					if (positions[j] == i) {
-						highlighted = 1;
-						break;
-					}
+			for (size_t j = 0; j < n; j++) {
+				if (positions[j] == i) {
+					highlighted = 1;
+					break;
 				}
 			}
 			if (highlighted) {

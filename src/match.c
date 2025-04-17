@@ -232,3 +232,11 @@ score_t match_positions(const char *needle, const char *haystack, size_t *positi
 score_t match(const char *needle, const char *haystack) {
 	return match_positions(needle, haystack, NULL);
 }
+
+#ifdef NO_CALC_SCORE_OPTION
+score_t match_stub(const char *needle, const char *haystack) {
+	(void)needle;
+	(void)haystack;
+	return SCORE_MIN;
+}
+#endif
