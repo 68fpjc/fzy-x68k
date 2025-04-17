@@ -58,14 +58,15 @@ static void draw_match(tty_interface_t *state, const char *choice, score_t score
 	}
 
 	tty_setnowrap(tty);
-	char code;
+	int code;
 	int clearline_done = 0;
-	for (size_t i = 0; (code = choice[i]) != '\0';) {
+	unsigned char *tmp_choice = (unsigned char *)choice;
+	for (size_t i = 0; (code = mbsnextc(tmp_choice)); i++) {
 		if (clearline_done == 0 && code == '\t') {
 			tty_clearline(tty);
 			clearline_done = 1;
 		}
-		if (i == 0 && selected)
+		if ((tmp_choice == (unsigned char *)choice) && selected)
 #ifdef TTY_SELECTION_UNDERLINE
 			tty_setunderline(tty);
 #else
@@ -87,13 +88,8 @@ static void draw_match(tty_interface_t *state, const char *choice, score_t score
 				tty_setfg(tty, TTY_COLOR_NORMAL);
 			}
 		}
-		tty_putc(tty, code);
-		if (ismbblead(code) && choice[i + 1]) {
-			tty_putc(tty, choice[i + 1]);
-			i += 2;
-		} else {
-			i++;
-		}
+		tty_putw(tty, code);
+		tmp_choice = mbsinc(tmp_choice);
 	}
 	tty_setwrap(tty);
 	tty_setnormal(tty);

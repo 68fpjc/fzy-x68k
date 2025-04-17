@@ -387,11 +387,11 @@ void tty_putc(tty_t *tty, const char c) {
 }
 
 void tty_putw(tty_t *tty, const short wc) {
-	char ch_high = wc >> 8;
+	char ch_high = _MBGETH(wc);
 	if (ch_high) {
 		tty_putc(tty, ch_high);
 	}
-	tty_putc(tty, wc & 0xff);
+	tty_putc(tty, _MBGETL(wc));
 }
 
 void tty_flush(tty_t *tty) {
