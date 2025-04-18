@@ -168,9 +168,9 @@ static TTY_KEY tty_to_tty_key_internal(const short ch, const int sftsns, const i
 			} else if (tty_sns_arrow_down(keybit7)) {
 				ret = TTY_KEY_DOWN;
 			} else if (tty_sns_rollup(keybit7)) {
-				ret = TTY_KEY_PAGEUP;
+				ret = TTY_KEY_PAGEDOWN; // PAGE UP と PAGE DOWN を入れ替える
 			} else if (tty_sns_rolldown(keybit7)) {
-				ret = TTY_KEY_PAGEDOWN;
+				ret = TTY_KEY_PAGEUP; // PAGE UP と PAGE DOWN を入れ替える
 			} else {
 				ret = TTY_KEY_NORMAL;
 			}
