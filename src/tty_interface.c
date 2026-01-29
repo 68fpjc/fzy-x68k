@@ -30,7 +30,8 @@ static void clear(tty_interface_t *state) {
 	tty_flush(tty);
 }
 
-static void draw_match(tty_interface_t *state, const char *choice, const char *choice_tty, score_t score, int selected) {
+static void draw_match(tty_interface_t *state, const char *choice, const char *choice_con,
+		       score_t score, int selected) {
 	tty_t *tty = state->tty;
 	options_t *options = state->options;
 	char *search = state->last_search;
@@ -57,13 +58,13 @@ static void draw_match(tty_interface_t *state, const char *choice, const char *c
 	tty_setnowrap(tty);
 	int code;
 	int clearline_done = 0;
-	unsigned char *tmp_choice = (unsigned char *)choice_tty;
+	unsigned char *tmp_choice = (unsigned char *)choice_con;
 	for (size_t i = 0; (code = mbsnextc(tmp_choice)); i++) {
 		if (clearline_done == 0 && code == '\t') {
 			tty_clearline(tty);
 			clearline_done = 1;
 		}
-		if ((tmp_choice == (unsigned char *)choice_tty) && selected)
+		if ((tmp_choice == (unsigned char *)choice_con) && selected)
 #ifdef TTY_SELECTION_UNDERLINE
 			tty_setunderline(tty);
 #else
@@ -131,8 +132,8 @@ static void draw_results(tty_interface_t *state) {
 		if (choice) {
 			tty_carriagereturn(tty);
 			tty_linefeed(tty);
-			draw_match(state, choice, choices_get_tty(choices, i), choices_getscore(choices, i),
-				   i == choices->selection);
+			draw_match(state, choice, choices_get_con(choices, i),
+				   choices_getscore(choices, i), i == choices->selection);
 			tty_clearline(tty);
 			choices_count++;
 		}
