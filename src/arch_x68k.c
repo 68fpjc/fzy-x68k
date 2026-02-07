@@ -13,18 +13,6 @@
 #define X68K_COLOR_NORMAL 33
 #define X68K_COLOR_HIGHLIGHT 36
 
-static int _dos_kflushonly(void) {
-	int ret;
-	__asm__ volatile(
-	    // MODE = -1 の技は ED.X が使っている
-	    "move.w	#-1, %%sp@-\n"
-	    ".short	0xff0c\n"
-	    "addq.l	#2, %%sp\n"
-	    : "=d"(ret) // Output operand to capture d0
-	);
-	return ret;
-}
-
 /**
  * @brief tty_getchar() が呼び出された時点のキーコードグループ 7 の状態
  */
@@ -270,17 +258,10 @@ short tty_getchar_nonblock(tty_t *tty) {
 	return ret;
 }
 
-static void tty_close_stdin(void) {
-	static int initialized = 0;
-	if (!initialized) {
-		fclose(stdin); // これをしないと DOS _KFLUSH が効かない？
-		initialized = 1;
-	}
-}
-
 void tty_flush_keys(void) {
-	tty_close_stdin();
-	_dos_kflushonly();
+	while (_dos_k_keysns()) {
+		_dos_k_keyinp();
+	}
 }
 
 tty_cursor_t tty_getcursor(tty_t *tty) {
