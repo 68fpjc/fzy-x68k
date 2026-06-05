@@ -31,7 +31,7 @@ CFLAGS_COMMON = -Wall -Wextra -std=c99 -pedantic -DVERSION=\"${VERSION}\" -D_GNU
   -m68000 -DHIGHLIGHT_OPTION -DNO_CALC_SCORE_OPTION -I$(LIBCONDRV_INCLUDE_DIR) -I$(LIBMB_INCLUDE_DIR)
 OBJS=src/fzy.o src/match.o src/choices.o src/options.o src/tty_interface.o \
   src/arch_x68k.o
-LDFLAGS =
+LDFLAGS = -specs=hupair.specs
 LDLIBS = -Wl,-lcondrv -Wl,-L$(LIBCONDRV_LIB_DIR) -Wl,-lmb -Wl,-L$(LIBMB_LIB_DIR)
 ifdef RELEASE_BUILD
   CFLAGS = $(CFLAGS_COMMON) -O3
