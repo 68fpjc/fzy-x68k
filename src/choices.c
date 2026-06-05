@@ -215,7 +215,7 @@ void choices_search(choices_t *c, const char *search) {
 	for (size_t i = 0; i < c->size; i++) {
 		if (has_match(search, c->strings[i])) {
 			c->results[c->available].str = c->strings[i];
-			c->results[c->available].str_con = c->strings_con[i];
+			c->results[c->available].str_tty = c->strings_con[i];
 			c->results[c->available].score = c->match(search, c->strings[i]);
 			c->available++;
 		}
@@ -262,7 +262,7 @@ int choices_search_step(choices_t *c, size_t batch_size) {
 	for (size_t i = c->processed_count; i < end; i++) {
 		if (has_match(c->last_search, c->strings[i])) {
 			c->results[c->available].str = c->strings[i];
-			c->results[c->available].str_con = c->strings_con[i];
+			c->results[c->available].str_tty = c->strings_con[i];
 			c->results[c->available].score = c->match(c->last_search, c->strings[i]);
 			c->available++;
 		}
@@ -292,9 +292,9 @@ const char *choices_get(choices_t *c, size_t n) {
 	}
 }
 
-const char *choices_get_con(choices_t *c, size_t n) {
+const char *choices_get_tty(choices_t *c, size_t n) {
 	if (n < c->available) {
-		return c->results[n].str_con;
+		return c->results[n].str_tty;
 	} else {
 		return NULL;
 	}

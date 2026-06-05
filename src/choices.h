@@ -9,7 +9,7 @@
 struct scored_result {
 	score_t score;
 	const char *str;
-	const char *str_con;
+	const char *str_tty;
 };
 
 typedef struct {
@@ -52,7 +52,7 @@ void choices_prev(choices_t *c);
 void choices_next(choices_t *c);
 
 void choices_finish_fread(choices_t *c, const size_t maxwidth, const int show_scores);
-const char *choices_get_con(choices_t *c, size_t n);
+const char *choices_get_tty(choices_t *c, size_t n);
 
 /*
  * Start a delayed search.
