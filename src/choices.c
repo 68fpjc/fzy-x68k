@@ -5,7 +5,6 @@
 #include <unistd.h>
 
 #include "choices.h"
-#include "chop.h"
 #include "match.h"
 #include "options.h"
 
@@ -87,34 +86,6 @@ void choices_fread(choices_t *c, FILE *file) {
 	} while (line);
 }
 
-static void buffer_output(int c, chop_output_context *ctx) {
-	if (ctx->ptr) {
-		*ctx->ptr++ = (char)c;
-	}
-}
-
-void choices_finish_fread(choices_t *c, const size_t maxwidth, const int show_scores) {
-	c->buffer_con = malloc(c->buffer_size);
-	if (!c->buffer_con) {
-		fprintf(stderr, "Error: Can't allocate memory\n");
-		abort();
-	}
-	c->strings_con = malloc(c->size * sizeof(char *));
-	if (!c->strings_con) {
-		fprintf(stderr, "Error: Can't allocate memory\n");
-		abort();
-	}
-	{
-		chop_output_context ctx = {buffer_output, c->buffer_con};
-		int col = !show_scores ? 0 : 8;
-		for (size_t i = 0; i < c->size; i++) {
-			c->strings_con[i] = ctx.ptr;
-			chop(c->strings[i], col, maxwidth, &ctx);
-			*ctx.ptr++ = '\0';
-		}
-	}
-}
-
 static void choices_resize(choices_t *c, size_t new_capacity) {
 	c->strings = safe_realloc(c->strings, new_capacity * sizeof(const char *));
 	c->capacity = new_capacity;
@@ -174,11 +145,6 @@ void choices_destroy(choices_t *c) {
 	}
 	c->processed_count = 0;
 	c->search_in_progress = 0;
-
-	free(c->buffer_con);
-	c->buffer_con = NULL;
-	free(c->strings_con);
-	c->strings_con = NULL;
 }
 
 void choices_add(choices_t *c, const char *choice) {
@@ -215,7 +181,6 @@ void choices_search(choices_t *c, const char *search) {
 	for (size_t i = 0; i < c->size; i++) {
 		if (has_match(search, c->strings[i])) {
 			c->results[c->available].str = c->strings[i];
-			c->results[c->available].str_tty = c->strings_con[i];
 			c->results[c->available].score = c->match(search, c->strings[i]);
 			c->available++;
 		}
@@ -262,7 +227,6 @@ int choices_search_step(choices_t *c, size_t batch_size) {
 	for (size_t i = c->processed_count; i < end; i++) {
 		if (has_match(c->last_search, c->strings[i])) {
 			c->results[c->available].str = c->strings[i];
-			c->results[c->available].str_tty = c->strings_con[i];
 			c->results[c->available].score = c->match(c->last_search, c->strings[i]);
 			c->available++;
 		}
@@ -287,14 +251,6 @@ int choices_is_search_complete(choices_t *c) {
 const char *choices_get(choices_t *c, size_t n) {
 	if (n < c->available) {
 		return c->results[n].str;
-	} else {
-		return NULL;
-	}
-}
-
-const char *choices_get_tty(choices_t *c, size_t n) {
-	if (n < c->available) {
-		return c->results[n].str_tty;
 	} else {
 		return NULL;
 	}

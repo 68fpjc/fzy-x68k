@@ -30,7 +30,7 @@ LD = $(CROSS)gcc
 CFLAGS_COMMON = -Wall -Wextra -std=c99 -pedantic -DVERSION=\"${VERSION}\" -D_GNU_SOURCE -MMD \
   -m68000 -DHIGHLIGHT_OPTION -DNO_CALC_SCORE_OPTION -I$(LIBCONDRV_INCLUDE_DIR) -I$(LIBMB_INCLUDE_DIR)
 OBJS=src/fzy.o src/match.o src/choices.o src/options.o src/tty_interface.o \
-  src/arch_x68k.o src/chop_x68k.o
+  src/arch_x68k.o
 LDFLAGS =
 LDLIBS = -Wl,-lcondrv -Wl,-L$(LIBCONDRV_LIB_DIR) -Wl,-lmb -Wl,-L$(LIBMB_LIB_DIR)
 ifdef RELEASE_BUILD
