@@ -49,7 +49,7 @@ X68000 ではビルドできません。 [elf2x68k](https://github.com/yunkya2/e
 
 ## 参考文献
 
-- [ぷにぐらま～ずまにゅある](https://github.com/jhawthorn/fzy)
+- [ぷにぐらま～ずまにゅある](https://github.com/kg68k/puni)
 
 ## 連絡先
 
